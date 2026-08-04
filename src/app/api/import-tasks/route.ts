@@ -43,7 +43,12 @@ export async function POST(request: Request) {
       estimatedRows: estimateRowCount(file.name, bytes)
     });
     if (!task) throw new Error("导入任务创建后无法读取任务状态。");
-    if (process.env.VERCEL === "1" && process.env.SERVERLESS_IMPORT_FALLBACK !== "false") {
+    const serverlessFallbackMaxRows = Number(process.env.SERVERLESS_IMPORT_MAX_ROWS || 2_000);
+    if (
+      process.env.VERCEL === "1" &&
+      process.env.SERVERLESS_IMPORT_FALLBACK !== "false" &&
+      task.total_rows <= serverlessFallbackMaxRows
+    ) {
       after(async () => {
         try {
           await processImportTaskInBackground(task.task_id);
