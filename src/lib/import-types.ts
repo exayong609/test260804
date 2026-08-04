@@ -74,6 +74,20 @@ export type ImportErrorInput = {
   traceId: string;
 };
 
+export function toImportErrorRecord(input: ImportErrorInput, rawValue: string) {
+  return {
+    task_id: input.taskId,
+    unit_id: input.unitId,
+    batch_index: input.batchIndex,
+    row_number: input.rowNumber,
+    field_name: input.fieldName,
+    raw_value: rawValue,
+    error_code: input.errorCode,
+    error_reason: input.errorReason,
+    trace_id: input.traceId
+  };
+}
+
 export type BatchPerformanceInput = {
   taskId: string;
   unitId: string;

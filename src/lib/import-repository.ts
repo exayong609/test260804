@@ -10,6 +10,7 @@ import type {
   OutboxRecord,
   ParsedTaskPayload
 } from "@/lib/import-types";
+import { toImportErrorRecord } from "@/lib/import-types";
 import type { OrderGroup, ParsedOrderRow } from "@/types";
 
 const DEFAULT_BATCH_SIZE = 1_000;
@@ -378,7 +379,9 @@ export async function completeBatch(input: {
     }
 
     if (input.errors.length) {
-      const errors = input.errors.map((error) => ({ ...error, rawValue: redact(error.fieldName, error.rawValue) }));
+      const errors = input.errors.map((error) =>
+        toImportErrorRecord(error, redact(error.fieldName, error.rawValue))
+      );
       await tx`
         insert into import_task_errors (
           task_id, unit_id, batch_index, row_number, field_name, raw_value, error_code, error_reason, trace_id
