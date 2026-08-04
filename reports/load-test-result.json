@@ -1,0 +1,30 @@
+{
+  "tested_at": "2026-08-04T11:37:16.790Z",
+  "app_url": "https://test260804.vercel.app",
+  "task_id": "task_12e9f542-39a8-4c39-adad-95732fbd65ab",
+  "trace_id": "trace_a176b481-cbb1-4e1a-ace2-d97074f6c1e2",
+  "file": "test-data/10000-orders.xlsx",
+  "sku_master_rows": 20000,
+  "upload_ms": 11603,
+  "total_ms": 108607,
+  "validate_p50_ms": 1035,
+  "validate_p95_ms": 1961,
+  "validate_max_ms": 1961,
+  "batch_total_p50_ms": 2079,
+  "batch_total_p95_ms": 2988,
+  "batch_total_max_ms": 2988,
+  "total_rows": 10000,
+  "processed_rows": 10000,
+  "success_rows": 9970,
+  "failed_rows": 30,
+  "expected_error_counts": {
+    "E001": 30,
+    "E004": 10
+  },
+  "total_batches": 10,
+  "completed_batches": 10,
+  "final_status": "partial_success",
+  "degraded": false,
+  "thousand_row_processing_target_passed": true,
+  "ten_thousand_row_sixty_second_capacity_target_passed": false
+}

@@ -7,7 +7,7 @@
 - `../test-data/sku-master-20000.csv`：20,000 条 SKU 主数据文件。
 - `../docs/反思题.md`：反思题回答。
 - `../docs/重构假设说明.md`：容量规划、幂等、降级、清理策略和产品问题清单。
-- `../docs/压测报告.md`：真实 Vercel + PostgreSQL + Redis 压测数据待部署后补齐。
+- `../docs/压测报告.md`：真实 Vercel + Neon PostgreSQL + Upstash Redis + Railway Worker 的 10,000 行压测证据。
 - `../docs/async-import-architecture.md`：异步事件驱动架构和运行边界。
 
-当前本地 `npm run loadtest` 不能代替线上验收，因为没有配置真实 PostgreSQL、Redis 和 Worker。正式提交前需要把压测报告中的“待填写”字段替换为多轮实测结果，并把在线地址写回汇总表。
+线上地址、仓库、反思题、交付清单和压测证据均已写入提交汇总表。压测环境未把数据库或 Redis 密钥写入仓库；运行时密钥仅配置在 Vercel / Railway 环境变量中。
