@@ -14,6 +14,7 @@ export async function GET() {
       storage: process.env.DATABASE_URL ? "database" : "local-json",
       llmConfigured: profiles.some((profile) => profile.enabled !== false && profile.hasApiKey),
       defaultRuleCount: DEFAULT_RULES.length,
+      gitCommit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
