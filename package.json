@@ -11,12 +11,18 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "worker": "tsx scripts/import-worker.ts",
+    "seed:loadtest": "tsx scripts/seed-loadtest.ts",
+    "loadtest": "tsx scripts/load-test.ts",
+    "test": "tsx --test tests/**/*.test.ts",
     "smoke": "node scripts/smoke-test.mjs",
     "demo:rules": "node scripts/demo-rule-regression.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.12",
+    "bullmq": "^6.0.6",
     "clsx": "^2.1.1",
+    "ioredis": "^6.0.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.468.0",
     "mammoth": "^1.8.0",
@@ -37,6 +43,7 @@
     "@types/react-dom": "^19.1.5",
     "eslint": "^9.28.0",
     "eslint-config-next": "^15.3.3",
+    "tsx": "^4.19.2",
     "typescript": "^5.8.3"
   }
 }

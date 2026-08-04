@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import Link from "next/link";
 import {
+  Activity,
   AlertCircle,
   Bot,
   CheckCircle2,
@@ -1016,6 +1018,7 @@ export default function Home() {
               <h1>万能导入管理</h1>
               <p>上传文件后选择规则模板，配置里预解析确认规则，主页全量解析后提交下单。</p>
             </div>
+            <Link className="async-entry-link" href="/import-tasks"><Activity size={15} />异步任务与监控</Link>
           </header>
 
           {busy && (

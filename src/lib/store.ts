@@ -22,9 +22,13 @@ function withDefaultRules(rules: ParsingRule[]) {
   return [...rules.filter((rule) => !defaultIds.has(rule.id)), ...DEFAULT_RULES.map((rule) => ({ ...rule, builtIn: true }))];
 }
 
-function getSql() {
+export function getSql() {
   if (!process.env.DATABASE_URL) return null;
-  sqlClient ||= postgres(process.env.DATABASE_URL, { max: 3, onnotice: () => undefined });
+  const configuredMax = Number(process.env.DATABASE_POOL_MAX || 10);
+  sqlClient ||= postgres(process.env.DATABASE_URL, {
+    max: Number.isFinite(configuredMax) ? Math.max(1, Math.min(configuredMax, 40)) : 10,
+    onnotice: () => undefined
+  });
   return sqlClient;
 }
 

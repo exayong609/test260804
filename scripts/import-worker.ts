@@ -1,0 +1,64 @@
+import { Worker } from "bullmq";
+import { dispatchOutboxEvents, getRedisConnection, IMPORT_QUEUE_NAME } from "../src/lib/import-queue";
+import { processImportBatch, processImportTask } from "../src/lib/import-processor";
+import { recoverStuckBatches } from "../src/lib/import-repository";
+import type { ImportBatchPayload } from "../src/lib/import-types";
+
+async function main() {
+const concurrency = Math.max(1, Math.min(Number(process.env.IMPORT_WORKER_CONCURRENCY || 4), 12));
+const connection = getRedisConnection().duplicate();
+
+const worker = new Worker(
+  IMPORT_QUEUE_NAME,
+  async (job) => {
+    if (job.name === "ImportTaskCreated") {
+      return processImportTask(String(job.data.task_id));
+    }
+    if (job.name === "ImportBatchCreated") {
+      return processImportBatch(job.data as ImportBatchPayload);
+    }
+    throw new Error(`不支持的导入事件：${job.name}`);
+  },
+  { connection, concurrency }
+);
+
+worker.on("completed", (job) => console.log(`[worker] completed ${job.name} ${job.id}`));
+worker.on("failed", (job, error) => console.error(`[worker] failed ${job?.name} ${job?.id}: ${error.message}`));
+worker.on("error", (error) => console.error(`[worker] error: ${error.message}`));
+
+let dispatching = false;
+async function dispatch() {
+  if (dispatching) return;
+  dispatching = true;
+  try {
+    const result = await dispatchOutboxEvents(50);
+    if (result.claimed) console.log(`[outbox] claimed=${result.claimed} sent=${result.sent}`);
+  } finally {
+    dispatching = false;
+  }
+}
+
+await dispatch();
+const dispatcher = setInterval(() => void dispatch(), 1_000);
+const recovery = setInterval(() => void recoverStuckBatches(), 60_000);
+
+async function shutdown(signal: string) {
+  console.log(`[worker] ${signal}, shutting down`);
+  clearInterval(dispatcher);
+  clearInterval(recovery);
+  await worker.close();
+  await connection.quit();
+  await getRedisConnection().quit();
+  process.exit(0);
+}
+
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+
+console.log(`[worker] listening queue=${IMPORT_QUEUE_NAME} concurrency=${concurrency}`);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

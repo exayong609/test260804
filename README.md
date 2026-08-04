@@ -82,6 +82,18 @@ npm run smoke
 npm run demo:rules
 ```
 
+## 异步导入与全链路观测
+
+访问 `/import-tasks` 可创建异步导入任务并查看进度、行级错误、批次性能和 Trace。该链路复用现有文件解析器与规则引擎，并通过 PostgreSQL Transactional Outbox + BullMQ Worker 执行。
+
+```bash
+npm run seed:loadtest  # 20,000 SKU + 10,000 行 Excel
+npm run worker         # 常驻消费者与 Outbox Dispatcher
+npm run loadtest       # 上传、轮询、60 秒目标判定
+```
+
+架构、幂等、降级和部署边界详见 `docs/async-import-architecture.md`。
+
 `npm run smoke` 会检查：
 
 - 首页和 `/api/health`
