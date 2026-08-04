@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { createImportTask, listImportTasks } from "@/lib/import-repository";
 import { estimateRowCount, fileHash } from "@/lib/import-upload";
 import { listRules } from "@/lib/store";
 import type { ParsingRule } from "@/types";
+import { processImportTaskInBackground } from "@/lib/serverless-import-fallback";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET() {
   try {
@@ -40,6 +42,16 @@ export async function POST(request: Request) {
       rule,
       estimatedRows: estimateRowCount(file.name, bytes)
     });
+    if (!task) throw new Error("导入任务创建后无法读取任务状态。");
+    if (process.env.VERCEL === "1" && process.env.SERVERLESS_IMPORT_FALLBACK !== "false") {
+      after(async () => {
+        try {
+          await processImportTaskInBackground(task.task_id);
+        } catch (error) {
+          console.error("[serverless-import-fallback] failed", error);
+        }
+      });
+    }
     return NextResponse.json({ ...task, upload_duration_ms: Math.round(performance.now() - started) }, { status: 202 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "异步任务创建失败。" }, { status: 500 });

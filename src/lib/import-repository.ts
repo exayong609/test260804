@@ -258,6 +258,15 @@ export async function markOutboxSent(id: string) {
   await sql`update event_outbox set status = 'sent', sent_at = now(), last_error = null where id = ${id}`;
 }
 
+export async function markOutboxForTaskSent(taskId: string, eventType: string) {
+  const sql = requireSql();
+  await sql`
+    update event_outbox
+    set status = 'sent', sent_at = coalesce(sent_at, now()), last_error = null
+    where aggregate_id = ${taskId} and event_type = ${eventType} and status in ('pending', 'processing', 'failed')
+  `;
+}
+
 export async function markOutboxFailed(id: string, error: string) {
   const sql = requireSql();
   await sql`
