@@ -9,5 +9,6 @@
 - `../docs/重构假设说明.md`：容量规划、幂等、降级、清理策略和产品问题清单。
 - `../docs/压测报告.md`：真实 Vercel + Neon PostgreSQL + Upstash Redis + Railway Worker 的 10,000 行压测证据。
 - `../docs/async-import-architecture.md`：异步事件驱动架构和运行边界。
+- `../docs/考试验收报告.md`：按考试考点整理的最终验收证据与现场展示检查清单。
 
 线上地址、仓库、反思题、交付清单和压测证据均已写入提交汇总表。压测环境未把数据库或 Redis 密钥写入仓库；运行时密钥仅配置在 Vercel / Railway 环境变量中。

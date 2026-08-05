@@ -71,6 +71,7 @@ model=MiniMax-M3
 - `docs/usage-guide.md`
 - `docs/ai-and-rules.md`
 - `docs/prompt-verification-report.md`
+- `docs/考试验收报告.md`
 
 ## 验证命令
 
