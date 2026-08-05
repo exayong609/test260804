@@ -64,6 +64,42 @@ type LlmProfileDraft = Omit<LlmProfile, "createdAt" | "updatedAt"> & {
   source?: LlmProfileView["source"];
 };
 
+type UploadProgress = { loaded: number; total: number; percent: number };
+
+function requestJsonWithUploadProgress<T>(params: {
+  url: string;
+  body: Document | XMLHttpRequestBodyInit | null;
+  headers?: Record<string, string>;
+  onProgress: (progress: UploadProgress) => void;
+  onUploaded: () => void;
+}) {
+  return new Promise<{ ok: boolean; status: number; data: T }>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", params.url);
+    Object.entries(params.headers || {}).forEach(([name, value]) => request.setRequestHeader(name, value));
+    request.responseType = "json";
+    request.upload.onprogress = (event) => {
+      if (!event.lengthComputable || !event.total) return;
+      params.onProgress({ loaded: event.loaded, total: event.total, percent: event.loaded / event.total * 100 });
+    };
+    request.upload.onload = params.onUploaded;
+    request.onerror = () => reject(new Error("网络连接失败，请检查网络后重试。"));
+    request.onabort = () => reject(new Error("请求已取消。"));
+    request.onload = () => {
+      let data = request.response as T;
+      if (data == null && request.responseText) {
+        try {
+          data = JSON.parse(request.responseText) as T;
+        } catch {
+          return reject(new Error(`服务端返回了无法解析的响应（HTTP ${request.status}）。`));
+        }
+      }
+      resolve({ ok: request.status >= 200 && request.status < 300, status: request.status, data });
+    };
+    request.send(params.body);
+  });
+}
+
 const DEFAULT_LLM_PROMPT = `你是物流批量下单系统的解析规则架构师。请根据上传文件的结构样本生成一份解析规则 JSON。
 要求：
 1. 只生成解析规则，不直接输出订单数据。
@@ -444,15 +480,13 @@ export default function Home() {
 
   async function runWithProgress<T>(label: string, task: () => Promise<T>) {
     setBusy(label);
-    setProgress(8);
+    setProgress(0);
     setProgressDetail("准备处理 0/1");
-    const timer = window.setInterval(() => setProgress((value) => Math.min(92, value + Math.random() * 14)), 220);
     try {
       const result = await task();
       setProgress(100);
       return result;
     } finally {
-      window.clearInterval(timer);
       window.setTimeout(() => {
         setBusy("");
         setProgress(0);
@@ -539,11 +573,27 @@ export default function Home() {
       form.append("file", file);
       if (selectedProfileId) form.append("profileId", selectedProfileId);
       form.append("prompt", aiPromptDraft);
-      const response = await fetch("/api/rules/generate", { method: "POST", body: form });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "生成规则失败");
-      setDocumentInfo(data.document);
-      setAiProvider(data.provider);
+      const response = await requestJsonWithUploadProgress<{
+        document?: IntermediateDocument;
+        provider?: "llm" | "fallback";
+        rule?: ParsingRule;
+        error?: string;
+      }>({
+        url: "/api/rules/generate",
+        body: form,
+        onProgress: ({ loaded, total, percent }) => {
+          setProgress(Math.min(90, percent * 0.9));
+          setProgressDetail(`上传样例 ${loaded.toLocaleString()}/${total.toLocaleString()} 字节`);
+        },
+        onUploaded: () => {
+          setProgress(92);
+          setProgressDetail("样例上传完成，模型正在生成规则");
+        }
+      });
+      const data = response.data;
+      if (!response.ok || !data.rule) throw new Error(data.error || "生成规则失败");
+      setDocumentInfo(data.document || null);
+      setAiProvider(data.provider || null);
       setRuleDraft(stringifyRuleDraft(data.rule));
       setSelectedRuleId("");
       setRuleConfigOpen(true);
@@ -571,8 +621,19 @@ export default function Home() {
     const form = new FormData();
     form.append("file", file);
     form.append("rule", JSON.stringify(parsedRule));
-    const response = await fetch("/api/parse", { method: "POST", body: form });
-    const data = (await response.json()) as { document?: IntermediateDocument; result?: ParseResult; error?: string };
+    const response = await requestJsonWithUploadProgress<{ document?: IntermediateDocument; result?: ParseResult; error?: string }>({
+      url: "/api/parse",
+      body: form,
+      onProgress: ({ loaded, total, percent }) => {
+        setProgress(Math.min(90, percent * 0.9));
+        setProgressDetail(`上传文件 ${loaded.toLocaleString()}/${total.toLocaleString()} 字节`);
+      },
+      onUploaded: () => {
+        setProgress(92);
+        setProgressDetail("文件上传完成，服务端正在解析");
+      }
+    });
+    const data = response.data;
     if (!response.ok) throw new Error(data.error || "解析失败");
     return data;
   }
@@ -989,19 +1050,33 @@ export default function Home() {
     await runWithProgress("正在提交下单", async () => {
       const submitTotal = groupsCount || rows.length;
       setProgressDetail(`待提交 0/${submitTotal} 单`);
-      const response = await fetch("/api/orders", {
-        method: "POST",
+      const payload = JSON.stringify({ rows });
+      const response = await requestJsonWithUploadProgress<{
+        successCount?: number;
+        failureCount?: number;
+        issues?: ValidationIssue[];
+        error?: string;
+      }>({
+        url: "/api/orders",
+        body: payload,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows })
+        onProgress: ({ loaded, total, percent }) => {
+          setProgress(Math.min(90, percent * 0.9));
+          setProgressDetail(`上传订单 ${loaded.toLocaleString()}/${total.toLocaleString()} 字节`);
+        },
+        onUploaded: () => {
+          setProgress(92);
+          setProgressDetail(`数据上传完成，服务端正在提交 ${submitTotal} 单`);
+        }
       });
-      const data = await response.json();
+      const data = response.data;
       if (!response.ok) {
         setServerIssues(data.issues || []);
         throw new Error(data.issues?.[0]?.message || data.error || "提交失败");
       }
-      setProgressDetail(`提交完成 ${data.successCount}/${submitTotal} 单，失败 ${data.failureCount} 单`);
+      setProgressDetail(`提交完成 ${data.successCount || 0}/${submitTotal} 单，失败 ${data.failureCount || 0} 单`);
       await openLatestHistory();
-      showToast("success", `提交成功 ${data.successCount} 单，失败 ${data.failureCount} 单。`);
+      showToast("success", `提交成功 ${data.successCount || 0} 单，失败 ${data.failureCount || 0} 单。`);
     }).catch((error) => {
       const message = error instanceof Error ? error.message : "提交失败。";
       recordImportError("提交下单失败", message);
