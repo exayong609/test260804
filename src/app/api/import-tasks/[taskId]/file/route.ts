@@ -28,14 +28,21 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       return NextResponse.json({ error: "文件传输后指纹校验失败。" }, { status: 409 });
     }
 
-    await persistImportFileAndActivate(taskId, file.type || "application/octet-stream", bytes, actualHash);
     const maxFallbackBytes = Number(process.env.SERVERLESS_IMPORT_MAX_BYTES || 512_000);
-    if (shouldUseServerlessFallback({
+    const runServerlessFallback = shouldUseServerlessFallback({
       isVercel: process.env.VERCEL === "1",
       disabled: process.env.SERVERLESS_IMPORT_FALLBACK === "false",
       fileSize: bytes.byteLength,
       maxBytes: maxFallbackBytes
-    })) {
+    });
+    await persistImportFileAndActivate(
+      taskId,
+      file.type || "application/octet-stream",
+      bytes,
+      actualHash,
+      { delivery: runServerlessFallback ? "serverless" : "queue" }
+    );
+    if (runServerlessFallback) {
       after(async () => {
         try {
           await processImportTaskInBackground(taskId);

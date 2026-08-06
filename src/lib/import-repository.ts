@@ -197,9 +197,11 @@ export async function persistImportFileAndActivate(
   taskId: string,
   mimeType: string,
   fileBytes: Uint8Array,
-  fileHash: string
+  fileHash: string,
+  options: { delivery?: "queue" | "serverless" } = {}
 ) {
   const sql = requireSql();
+  const delivery = options.delivery ?? "queue";
   return sql.begin(async (tx) => {
     const tasks = await tx<{ trace_id: string; file_hash: string }[]>`
       select trace_id, file_hash from import_tasks where id = ${taskId} limit 1
@@ -216,7 +218,10 @@ export async function persistImportFileAndActivate(
     `;
     await tx`
       update event_outbox
-      set status = 'pending', next_retry_at = now(), last_error = null
+      set status = ${delivery === "queue" ? "pending" : "sent"},
+        next_retry_at = now(),
+        sent_at = ${delivery === "queue" ? null : new Date()},
+        last_error = null
       where aggregate_id = ${taskId} and event_type = 'ImportTaskCreated'
         and status in ('pending', 'failed')
     `;
@@ -224,8 +229,8 @@ export async function persistImportFileAndActivate(
       insert into trace_events (trace_id, task_id, event_name, event_status, message, metadata)
       values (
         ${task.trace_id}, ${taskId}, 'ImportFilePersisted', 'success',
-        '原始文件已持久化，Outbox 已激活',
-        ${tx.json({ size_bytes: fileBytes.byteLength, file_hash: fileHash })}
+        ${delivery === "queue" ? "原始文件已持久化，Outbox 已激活" : "原始文件已持久化，已转交 Vercel 兜底处理"},
+        ${tx.json({ size_bytes: fileBytes.byteLength, file_hash: fileHash, delivery })}
       )
     `;
     return { traceId: task.trace_id };
@@ -619,6 +624,16 @@ export async function recordInsertDuration(taskId: string, unitId: string, inser
       insert_duration_ms = ${insertDurationMs},
       total_duration_ms = ${totalDurationMs ?? insertDurationMs}
     where task_id = ${taskId} and unit_id = ${unitId}
+  `;
+}
+
+export async function reactivateOutboxForTask(taskId: string, eventType: string) {
+  const sql = requireSql();
+  await sql`
+    update event_outbox
+    set status = 'pending', next_retry_at = now(), sent_at = null,
+      last_error = 'Serverless fallback failed; returned to queue delivery'
+    where aggregate_id = ${taskId} and event_type = ${eventType} and status = 'sent'
   `;
 }
 

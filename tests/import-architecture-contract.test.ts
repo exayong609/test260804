@@ -25,6 +25,16 @@ test("file persistence activates Outbox only after hash verification", async () 
   assert.match(activation, /insert into import_files/);
   assert.match(activation, /next_retry_at = now\(\)/);
   assert.match(activation, /ImportFilePersisted/);
+  assert.match(activation, /delivery === "queue"/);
+});
+
+test("serverless fallback avoids queue races and preserves parse and rule timings", async () => {
+  const fallback = await source("src/lib/serverless-import-fallback.ts");
+  assert.match(fallback, /markOutboxForTaskSent\(taskId, "ImportTaskCreated"\)/);
+  assert.match(fallback, /markOutboxForTaskSent\(taskId, "ImportBatchCreated"\)/);
+  assert.match(fallback, /reactivateOutboxForTask/);
+  assert.match(fallback, /parse_duration_ms: parseDurationMs/);
+  assert.match(fallback, /rule_duration_ms: ruleDurationMs/);
 });
 
 test("an interrupted browser upload can resume the existing task", async () => {

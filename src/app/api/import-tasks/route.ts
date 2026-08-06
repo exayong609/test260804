@@ -101,7 +101,13 @@ export async function POST(request: Request) {
 
     after(async () => {
       try {
-        await persistImportFileAndActivate(task.task_id, file.type || "application/octet-stream", bytes, hash);
+        await persistImportFileAndActivate(
+          task.task_id,
+          file.type || "application/octet-stream",
+          bytes,
+          hash,
+          { delivery: runServerlessFallback ? "serverless" : "queue" }
+        );
         if (runServerlessFallback) await processImportTaskInBackground(task.task_id);
       } catch (error) {
         console.error("[import-file-persist] failed", error);
