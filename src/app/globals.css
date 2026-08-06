@@ -3796,7 +3796,7 @@ textarea:focus {
   background: var(--oc-panel-2); border: 1px solid var(--oc-line); border-radius: 8px;
   padding: 8px 10px; cursor: pointer; color: var(--oc-text); text-align: left;
 }
-.oc-errdist-row:hover { border-color: var(--oc-red); background: var(--oc-red-soft); }
+.ops-console .oc-errdist-row:hover { border-color: var(--oc-red); background: var(--oc-red-soft); }
 .oc-errdist-row code { color: var(--oc-red); font-size: 12px; font-weight: 600; }
 .oc-errdist-bar { height: 8px; background: #fde2e4; border-radius: 4px; overflow: hidden; }
 .oc-errdist-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffa39e, var(--oc-red)); border-radius: 4px; }
@@ -3815,12 +3815,12 @@ textarea:focus {
   border-radius: 6px; padding: 8px 16px; font-size: 12px; cursor: pointer; text-decoration: none;
   transition: all 0.18s ease;
 }
-.oc-btn:hover { background: var(--oc-teal-soft); }
+.ops-console .oc-btn:hover { background: var(--oc-teal-soft); }
 .oc-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .oc-btn.primary { background: var(--oc-teal); color: #fff; font-weight: 600; border-color: var(--oc-teal); }
 .oc-btn.primary:hover { background: var(--oc-teal-dark); border-color: var(--oc-teal-dark); }
 .oc-icon-btn { background: #fff; border: 1px solid var(--oc-line); color: var(--oc-dim); border-radius: 6px; padding: 4px 6px; cursor: pointer; display: inline-flex; }
-.oc-icon-btn:hover { color: var(--oc-teal-dark); border-color: var(--oc-teal); }
+.ops-console .oc-icon-btn:hover { color: var(--oc-teal-dark); border-color: var(--oc-teal); background: #fff; }
 .oc-trace-result { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 
 .oc-upload {
@@ -3848,7 +3848,7 @@ textarea:focus {
 .oc-task-row span b { display: block; font-size: 12px; color: var(--oc-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .oc-task-row span small { font-family: var(--oc-mono); font-size: 10px; }
 .oc-task-row.active { border-color: var(--oc-teal); background: var(--oc-teal-soft); }
-.oc-task-row:hover { border-color: var(--oc-teal); background: var(--oc-teal-soft); }
+.ops-console .oc-task-row:hover { border-color: var(--oc-teal); background: var(--oc-teal-soft); }
 
 .oc-status { font-style: normal; font-family: var(--oc-mono); font-size: 10px; padding: 3px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
 .oc-status.pending { color: #86909c; border-color: #c9cdd4; background: #f7f8fa; }
@@ -3905,7 +3905,7 @@ textarea:focus {
   background: #fff; border: 1px solid var(--oc-line); color: var(--oc-text);
   border-radius: 6px; padding: 5px 10px; font-size: 11px; cursor: pointer;
 }
-.oc-pagination button:hover:not(:disabled) { border-color: var(--oc-teal); color: var(--oc-teal-dark); background: var(--oc-teal-soft); }
+.ops-console .oc-pagination button:hover:not(:disabled) { border-color: var(--oc-teal); color: var(--oc-teal-dark); background: var(--oc-teal-soft); }
 .oc-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .ops-console .spin { animation: oc-spin 0.9s linear infinite; }
@@ -3934,5 +3934,5 @@ textarea:focus {
   background: none; border: none; border-bottom: 2px solid transparent;
   cursor: pointer; margin-bottom: -1px;
 }
-.oc-tab:hover { color: var(--oc-teal-dark); background: none; }
+.ops-console .oc-tab:hover { color: var(--oc-teal-dark); background: none; }
 .oc-tab.active { color: var(--oc-teal-dark); border-bottom-color: var(--oc-teal); font-weight: 600; }
