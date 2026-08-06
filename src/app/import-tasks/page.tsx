@@ -442,7 +442,7 @@ export default function ImportTasksPage() {
             {tasks.length === 0 ? <div className="oc-empty">暂无异步任务</div> : tasks.map((task) => (
               <button key={task.task_id} title={`${task.file_name} · ${task.task_id}`} className={`oc-task-row ${selected?.task_id === task.task_id ? "active" : ""}`} onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
                 <FileSpreadsheet size={15} />
-                <span><b>{task.file_name}</b><small>{new Date(task.created_at).toLocaleTimeString("zh-CN", { hour12: false })} · {task.total_rows.toLocaleString()} 行{task.failed_rows > 0 ? ` · 失败 ${task.failed_rows.toLocaleString()}` : ""}</small></span>
+                <span><b>{task.file_name}</b><small>#{task.task_id.slice(5, 12)} · {new Date(task.created_at).toLocaleTimeString("zh-CN", { hour12: false })} · {task.total_rows.toLocaleString()} 行{task.failed_rows > 0 ? ` · 失败 ${task.failed_rows.toLocaleString()}` : ""}</small></span>
                 <em className={`oc-status ${task.status}`}>{statusText[task.status]}</em>
               </button>
             ))}
