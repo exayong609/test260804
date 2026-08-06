@@ -749,18 +749,18 @@ export async function monitorSummary() {
     sql`select status, count(*)::int as units, coalesce(sum(end_row - start_row + 1), 0)::int as rows from import_task_batches group by status`,
     sql`
       select
-        percentile_cont(0.5) within group (order by parse_duration_ms)::int as parse_p50,
-        percentile_cont(0.95) within group (order by parse_duration_ms)::int as parse_p95,
-        percentile_cont(0.99) within group (order by parse_duration_ms)::int as parse_p99,
-        percentile_cont(0.5) within group (order by rule_duration_ms)::int as rule_p50,
-        percentile_cont(0.95) within group (order by rule_duration_ms)::int as rule_p95,
-        percentile_cont(0.99) within group (order by rule_duration_ms)::int as rule_p99,
-        percentile_cont(0.5) within group (order by validate_duration_ms)::int as validate_p50,
-        percentile_cont(0.95) within group (order by validate_duration_ms)::int as validate_p95,
-        percentile_cont(0.99) within group (order by validate_duration_ms)::int as validate_p99,
-        percentile_cont(0.5) within group (order by insert_duration_ms)::int as insert_p50,
-        percentile_cont(0.95) within group (order by insert_duration_ms)::int as insert_p95,
-        percentile_cont(0.99) within group (order by insert_duration_ms)::int as insert_p99
+        (percentile_cont(0.5) within group (order by parse_duration_ms) filter (where parse_duration_ms > 0))::int as parse_p50,
+        (percentile_cont(0.95) within group (order by parse_duration_ms) filter (where parse_duration_ms > 0))::int as parse_p95,
+        (percentile_cont(0.99) within group (order by parse_duration_ms) filter (where parse_duration_ms > 0))::int as parse_p99,
+        (percentile_cont(0.5) within group (order by rule_duration_ms) filter (where rule_duration_ms > 0))::int as rule_p50,
+        (percentile_cont(0.95) within group (order by rule_duration_ms) filter (where rule_duration_ms > 0))::int as rule_p95,
+        (percentile_cont(0.99) within group (order by rule_duration_ms) filter (where rule_duration_ms > 0))::int as rule_p99,
+        (percentile_cont(0.5) within group (order by validate_duration_ms) filter (where validate_duration_ms > 0))::int as validate_p50,
+        (percentile_cont(0.95) within group (order by validate_duration_ms) filter (where validate_duration_ms > 0))::int as validate_p95,
+        (percentile_cont(0.99) within group (order by validate_duration_ms) filter (where validate_duration_ms > 0))::int as validate_p99,
+        (percentile_cont(0.5) within group (order by insert_duration_ms) filter (where insert_duration_ms > 0))::int as insert_p50,
+        (percentile_cont(0.95) within group (order by insert_duration_ms) filter (where insert_duration_ms > 0))::int as insert_p95,
+        (percentile_cont(0.99) within group (order by insert_duration_ms) filter (where insert_duration_ms > 0))::int as insert_p99
       from batch_performance_log where created_at >= now() - interval '1 hour'
     `,
     sql`select error_code, count(*)::int as count from import_task_errors where created_at >= now() - interval '1 hour' group by error_code order by count desc`,

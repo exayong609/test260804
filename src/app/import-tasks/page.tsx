@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -112,6 +112,8 @@ export default function ImportTasksPage() {
   const [rules, setRules] = useState<ParsingRule[]>([]);
   const [ruleId, setRuleId] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [fileFingerprint, setFileFingerprint] = useState("");
+  const fingerprintRequest = useRef(0);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [errors, setErrors] = useState<ImportError[]>([]);
@@ -208,12 +210,11 @@ export default function ImportTasksPage() {
   }
 
   async function createTask() {
-    if (!file || !ruleId) return;
+    if (!file || !ruleId || !fileFingerprint) return;
     setBusy(true);
     setNotice("");
     try {
       const started = performance.now();
-      const fingerprint = await sha256Blob(file);
       const task = await readJson<Task & { upload_duration_ms?: number; duplicated?: boolean; file_upload_pending?: boolean; notice?: string }>(await fetch("/api/import-tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -221,7 +222,7 @@ export default function ImportTasksPage() {
           fileName: file.name,
           mimeType: file.type || "application/octet-stream",
           fileSize: file.size,
-          fileHash: fingerprint,
+          fileHash: fileFingerprint,
           estimatedRows: 0,
           ruleId
         })
@@ -232,7 +233,7 @@ export default function ImportTasksPage() {
         setNotice(task.duplicated
           ? "已找到上次未完成上传的任务，正在继续上传文件。"
           : `任务已创建：接口 ${task.upload_duration_ms ?? 0}ms，客户端 ${Math.round(performance.now() - started)}ms；文件正在后台上传。`);
-        void uploadTaskFile(task.task_id, fingerprint, file);
+        void uploadTaskFile(task.task_id, fileFingerprint, file);
       } else {
         setNotice(task.notice ?? "相同文件已导入，已定位到已有任务。");
       }
@@ -411,10 +412,22 @@ export default function ImportTasksPage() {
         <label className="async-file-picker">
           <UploadCloud size={18} />
           <span>{file?.name || "选择 Excel、Word 或 PDF 文件"}</span>
-          <input type="file" accept=".xlsx,.xls,.docx,.pdf" onChange={(event) => setFile(event.target.files?.[0] || null)} />
+          <input type="file" accept=".xlsx,.xls,.docx,.pdf" onChange={(event) => {
+            const nextFile = event.target.files?.[0] || null;
+            const request = ++fingerprintRequest.current;
+            setFile(nextFile);
+            setFileFingerprint("");
+            if (nextFile) {
+              void sha256Blob(nextFile).then((hash) => {
+                if (request === fingerprintRequest.current) setFileFingerprint(hash);
+              }).catch(() => {
+                if (request === fingerprintRequest.current) setNotice("文件指纹计算失败，请重新选择文件。");
+              });
+            }
+          }} />
         </label>
         <label className="async-rule-select"><span>解析规则</span><select value={ruleId} onChange={(event) => setRuleId(event.target.value)}><option value="">请选择规则</option>{rules.map((rule) => <option key={rule.id} value={rule.id}>{rule.name}</option>)}</select></label>
-        <button className="primary async-create" disabled={!file || !ruleId || busy} onClick={() => void createTask()}>{busy ? <Loader2 size={15} className="spin" /> : <UploadCloud size={15} />}创建异步任务</button>
+        <button className="primary async-create" aria-busy={busy || Boolean(file && !fileFingerprint)} disabled={!file || !ruleId || !fileFingerprint || busy} onClick={() => void createTask()}>{busy ? <Loader2 size={15} className="spin" /> : <UploadCloud size={15} />}创建异步任务</button>
       </section>
       {(notice || loadError) && <div className={`async-notice ${loadError ? "error" : ""}`}>{loadError || notice}</div>}
 
