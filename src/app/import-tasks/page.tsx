@@ -366,7 +366,7 @@ export default function ImportTasksPage() {
       ) : (
         <div id="work-panel" className="async-tab-panel" role="tabpanel" aria-labelledby="work-tab">
 
-      <section className="async-data-block">
+      <section className="async-data-block async-trace-block">
         <div className="async-section-head"><div><b>Trace 检索</b><span>按 trace_id / 文件名 / 错误码 / 行号范围定位失败节点</span></div><Search size={15} /></div>
         <div className="async-trace-search">
           <input placeholder="task_id" value={traceQuery.task_id} onChange={(event) => setTraceQuery((q) => ({ ...q, task_id: event.target.value }))} />

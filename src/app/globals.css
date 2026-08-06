@@ -977,6 +977,16 @@ textarea:focus {
   margin-bottom: 12px;
 }
 
+#work-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+#work-panel .async-upload-band { order: 1; }
+#work-panel .async-notice { order: 2; }
+#work-panel .async-workspace { order: 3; }
+#work-panel .async-trace-block { order: 4; }
+
 .async-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
