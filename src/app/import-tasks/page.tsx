@@ -126,6 +126,7 @@ export default function ImportTasksPage() {
   const [traceQuery, setTraceQuery] = useState({ task_id: "", trace_id: "", file_name: "", batch: "", error_code: "", row_from: "", row_to: "" });
   const [traceResult, setTraceResult] = useState<TraceSearchResult | null>(null);
   const [traceSearching, setTraceSearching] = useState(false);
+  const [activeTab, setActiveTab] = useState<"work" | "monitor">("work");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [loadError, setLoadError] = useState("");
@@ -291,10 +292,21 @@ export default function ImportTasksPage() {
         <div className="async-health"><span /><b>Worker 链路</b><small>2 秒刷新</small></div>
       </header>
 
-      {monitorDown && <div className="async-notice error"><AlertTriangle size={14} /> 监控数据源不可用（红色告警）：队列/数据库连接异常，请检查 Worker 与数据库状态。</div>}
-      {!monitorDown && failedUnits > 0 && <div className="async-notice error"><AlertTriangle size={14} /> 告警：当前有 {failedUnits} 个失败处理单元，请进入任务详情查看失败节点并重试。</div>}
-      {!monitorDown && waiting > 5_000 && <div className="async-notice warning"><AlertTriangle size={14} /> 告警：队列积压 {waiting.toLocaleString()} 行，已超过 5,000 行阈值。</div>}
-      {!monitorDown && validateP99 > 3_000 && <div className="async-notice warning"><Clock3 size={14} /> 告警：校验 P99 为 {validateP99}ms，已超过 3,000ms 阈值。</div>}
+      <nav className="async-view-tabs" role="tablist" aria-label="异步导入视图">
+        <button id="work-tab" role="tab" aria-selected={activeTab === "work"} aria-controls="work-panel" className={activeTab === "work" ? "active" : ""} onClick={() => setActiveTab("work")}>
+          <FileSpreadsheet size={15} />导入作业
+        </button>
+        <button id="monitor-tab" role="tab" aria-selected={activeTab === "monitor"} aria-controls="monitor-panel" className={activeTab === "monitor" ? "active" : ""} onClick={() => setActiveTab("monitor")}>
+          <Activity size={15} />监控指标
+        </button>
+      </nav>
+
+      {activeTab === "monitor" ? (
+        <div id="monitor-panel" className="async-tab-panel" role="tabpanel" aria-labelledby="monitor-tab">
+          {monitorDown && <div className="async-notice error"><AlertTriangle size={14} /> 监控数据源不可用（红色告警）：队列/数据库连接异常，请检查 Worker 与数据库状态。</div>}
+          {!monitorDown && failedUnits > 0 && <div className="async-notice error"><AlertTriangle size={14} /> 告警：当前有 {failedUnits} 个失败处理单元，请进入任务详情查看失败节点并重试。</div>}
+          {!monitorDown && waiting > 5_000 && <div className="async-notice warning"><AlertTriangle size={14} /> 告警：队列积压 {waiting.toLocaleString()} 行，已超过 5,000 行阈值。</div>}
+          {!monitorDown && validateP99 > 3_000 && <div className="async-notice warning"><Clock3 size={14} /> 告警：校验 P99 为 {validateP99}ms，已超过 3,000ms 阈值。</div>}
 
       <section className="async-metrics">
         <Metric icon={<Activity size={16} />} label="实时吞吐" value={(monitor?.throughput_per_minute ?? 0).toLocaleString()} unit="行/分钟" />
@@ -339,17 +351,20 @@ export default function ImportTasksPage() {
         </div>
       </section>
 
-      <section className="async-data-block">
-        <div className="async-section-head"><div><b>错误类型分布（近 1 小时）</b><span>点击错误码跳转到明细筛选</span></div><AlertTriangle size={15} /></div>
-        <div className="async-error-dist">
-          {(monitor?.errors ?? []).map((item) => (
-            <button key={item.error_code} title={`筛选 ${item.error_code} 错误明细`} onClick={() => { setErrorCode(item.error_code); setErrorPage(1); }}>
-              <code>{item.error_code}</code><b>{item.count.toLocaleString()}</b>
-            </button>
-          ))}
-          {!monitor?.errors?.length && <span className="async-empty compact">近 1 小时暂无错误</span>}
+          <section className="async-data-block">
+            <div className="async-section-head"><div><b>错误类型分布（近 1 小时）</b><span>点击错误码跳转到明细筛选</span></div><AlertTriangle size={15} /></div>
+            <div className="async-error-dist">
+              {(monitor?.errors ?? []).map((item) => (
+                <button key={item.error_code} title={`筛选 ${item.error_code} 错误明细`} onClick={() => { setErrorCode(item.error_code); setErrorPage(1); setActiveTab("work"); }}>
+                  <code>{item.error_code}</code><b>{item.count.toLocaleString()}</b>
+                </button>
+              ))}
+              {!monitor?.errors?.length && <span className="async-empty compact">近 1 小时暂无错误</span>}
+            </div>
+          </section>
         </div>
-      </section>
+      ) : (
+        <div id="work-panel" className="async-tab-panel" role="tabpanel" aria-labelledby="work-tab">
 
       <section className="async-data-block">
         <div className="async-section-head"><div><b>Trace 检索</b><span>按 trace_id / 文件名 / 错误码 / 行号范围定位失败节点</span></div><Search size={15} /></div>
@@ -445,6 +460,8 @@ export default function ImportTasksPage() {
           </>}
         </section>
       </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -931,6 +931,52 @@ textarea:focus {
   margin-left: auto;
 }
 
+.async-view-tabs {
+  display: flex;
+  max-width: 1480px;
+  height: 46px;
+  margin: 0 auto 14px;
+  border: 1px solid #dce5e9;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.async-view-tabs button {
+  display: inline-flex;
+  min-width: 150px;
+  height: 45px;
+  min-height: 45px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-right: 1px solid #e8eef0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0 20px;
+  color: #657180;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.async-view-tabs button:first-child { border-radius: 5px 0 0 5px; }
+.async-view-tabs button.active {
+  border-bottom-color: #0b8e85;
+  color: #086f69;
+  background: #f2fbfa;
+}
+
+.async-tab-panel {
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+.async-tab-panel > .async-data-block,
+.async-tab-panel > .async-detail-grid {
+  margin-bottom: 12px;
+}
+
 .async-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1149,6 +1195,41 @@ textarea:focus {
 .async-timeline small { margin-top: 3px; color: #7e8a93; font-size: 9px; line-height: 1.4; }
 
 .async-errors { margin-top: 12px; }
+.async-errors .async-table-wrap {
+  max-height: 360px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.async-errors .async-table-wrap th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  box-shadow: 0 1px 0 #e3eaed;
+}
+.async-pagination {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid #e8eef0;
+  padding: 8px 12px;
+  background: #fff;
+}
+.async-pagination button {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #d7e0e4;
+  border-radius: 4px;
+  padding: 0 9px;
+  color: #0b7777;
+  background: #fff;
+  font-size: 10px;
+}
+.async-pagination button:disabled { color: #9ba7ae; background: #f7f9fa; }
+.async-pagination span { color: #657180; font-size: 10px; }
 .async-errors .async-section-head label { display: flex; align-items: center; gap: 6px; }
 .async-empty { padding: 42px 16px; color: #86929b; font-size: 12px; text-align: center; }
 .async-empty.compact { padding: 24px; }
@@ -1164,6 +1245,7 @@ textarea:focus {
   .async-import-page { padding: 16px; }
   .async-page-header { align-items: flex-start; flex-direction: column; }
   .async-health { width: 100%; }
+  .async-view-tabs button { min-width: 0; flex: 1; }
   .async-metrics { grid-template-columns: 1fr 1fr; }
   .async-upload-band { grid-template-columns: 1fr; }
   .async-workspace { grid-template-columns: 1fr; }
@@ -1173,6 +1255,7 @@ textarea:focus {
   .async-detail-head { align-items: flex-start; flex-direction: column; }
   .async-detail-actions { width: 100%; flex-wrap: wrap; }
   .async-detail-head p { overflow-wrap: anywhere; }
+  .async-errors .async-table-wrap { max-height: 320px; }
 }
 
 .opm-preview {
