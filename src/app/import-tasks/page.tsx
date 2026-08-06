@@ -300,10 +300,10 @@ export default function ImportTasksPage() {
           <b>{(monitor?.latency?.validate_p95 ?? 0).toLocaleString()}</b>
           <em>毫秒</em>
         </div>
-        <div className={`oc-kpi ${failedUnits ? "bad" : ""}`}>
+        <div className={`oc-kpi oc-clickable ${failedUnits ? "bad" : ""}`} title="点击查看导入任务" onClick={() => setTab("ops")}>
           <small><AlertTriangle size={12} />失败批次</small>
           <b>{failedUnits.toLocaleString()}</b>
-          <em>个处理单元</em>
+          <em>个处理单元 · 点击下钻</em>
         </div>
       </section>
 
@@ -316,7 +316,7 @@ export default function ImportTasksPage() {
           <div className="oc-panel-head"><b>队列状态</b><span>处理单元按状态分布</span><Database size={14} className="oc-panel-icon" /></div>
           <div className="oc-queue">
             {(monitor?.queue ?? []).map((item) => (
-              <div key={item.status} className={`oc-queue-row ${item.status}`}>
+              <div key={item.status} className={`oc-queue-row ${item.status} ${item.status === "failed" && item.units > 0 ? "oc-clickable" : ""}`} title={item.status === "failed" && item.units > 0 ? "点击查看导入任务" : undefined} onClick={item.status === "failed" && item.units > 0 ? () => setTab("ops") : undefined}>
                 <span className="oc-queue-dot" />
                 <span className="oc-queue-name">{item.status}</span>
                 <b>{item.units.toLocaleString()}</b>
@@ -334,15 +334,18 @@ export default function ImportTasksPage() {
               const p50 = monitor?.latency?.[`${stage.key}_p50`] ?? 0;
               const p95 = monitor?.latency?.[`${stage.key}_p95`] ?? 0;
               const p99 = monitor?.latency?.[`${stage.key}_p99`] ?? 0;
+              const empty = !p50 && !p95 && !p99;
               return (
                 <div key={stage.key} className="oc-latency-row">
                   <span className="oc-latency-name">{stage.label}</span>
                   <div className="oc-latency-bars">
-                    <i className="p50" style={{ width: `${Math.max(2, p50 / latencyMax * 100)}%` }} />
-                    <i className="p95" style={{ width: `${Math.max(2, p95 / latencyMax * 100)}%` }} />
-                    <i className="p99" style={{ width: `${Math.max(2, p99 / latencyMax * 100)}%` }} />
+                    {!empty && <>
+                      <i className="p50" style={{ width: `${Math.max(2, p50 / latencyMax * 100)}%` }} />
+                      <i className="p95" style={{ width: `${Math.max(2, p95 / latencyMax * 100)}%` }} />
+                      <i className="p99" style={{ width: `${Math.max(2, p99 / latencyMax * 100)}%` }} />
+                    </>}
                   </div>
-                  <span className="oc-latency-nums"><b>{p95}</b><em>P95 ms</em></span>
+                  <span className="oc-latency-nums">{empty ? <><b>—</b><em>暂无数据</em></> : <><b>{p95}</b><em>P95 ms</em></>}</span>
                 </div>
               );
             })}
@@ -356,12 +359,12 @@ export default function ImportTasksPage() {
           <div className="oc-panel-head"><b>慢批次 TOP 10</b><span>近 24 小时 · 按总耗时倒序</span><Clock3 size={14} className="oc-panel-icon" /></div>
           <div className="oc-table-wrap"><table className="oc-table"><thead><tr><th>文件</th><th>批次</th><th>校验</th><th>写入</th><th>总耗时</th></tr></thead><tbody>
             {(monitor?.slow_batches ?? []).map((batch) => (
-              <tr key={`${batch.task_id}_${batch.unit_id}`}>
+              <tr key={`${batch.task_id}_${batch.unit_id}`} className="oc-row-link" title={`定位任务 ${batch.task_id}`} onClick={() => { setSelectedId(batch.task_id); setErrorPage(1); setTab("ops"); }}>
                 <td title={batch.file_name ?? batch.task_id}>{(batch.file_name ?? batch.task_id).slice(0, 22)}</td>
                 <td><code>{batch.unit_id}</code></td>
                 <td>{batch.validate_duration_ms}ms</td>
                 <td>{batch.insert_duration_ms}ms</td>
-                <td><b>{batch.total_duration_ms}ms</b></td>
+                <td><b>{batch.total_duration_ms}ms</b><span className="oc-row-hint">→</span></td>
               </tr>
             ))}
             {!monitor?.slow_batches?.length && <tr><td colSpan={5} className="oc-empty-cell">近 24 小时暂无批次性能数据</td></tr>}
@@ -384,40 +387,6 @@ export default function ImportTasksPage() {
           </div>
         </div>
       </section>
-
-      <section className="oc-panel">
-        <div className="oc-panel-head"><b>Trace 检索</b><span>按 trace_id / 文件名 / 错误码 / 行号范围定位失败节点</span><Search size={14} className="oc-panel-icon" /></div>
-        <div className="oc-trace-search">
-          <input placeholder="trace_id" value={traceQuery.trace_id} onChange={(event) => setTraceQuery((q) => ({ ...q, trace_id: event.target.value }))} />
-          <input placeholder="文件名（模糊）" value={traceQuery.file_name} onChange={(event) => setTraceQuery((q) => ({ ...q, file_name: event.target.value }))} />
-          <input placeholder="错误码 E001" value={traceQuery.error_code} onChange={(event) => setTraceQuery((q) => ({ ...q, error_code: event.target.value }))} />
-          <input placeholder="行号从" inputMode="numeric" value={traceQuery.row_from} onChange={(event) => setTraceQuery((q) => ({ ...q, row_from: event.target.value }))} />
-          <input placeholder="行号到" inputMode="numeric" value={traceQuery.row_to} onChange={(event) => setTraceQuery((q) => ({ ...q, row_to: event.target.value }))} />
-          <button className="oc-btn" disabled={traceSearching} onClick={() => void runTraceSearch()}>{traceSearching ? <Loader2 size={13} className="spin" /> : <Search size={13} />}检索</button>
-        </div>
-        {traceResult && (
-          <div className="oc-trace-result">
-            {traceResult.tasks.map((task) => (
-              <button key={task.task_id} className="oc-task-row" onClick={() => { setSelectedId(task.task_id); setErrorPage(1); setTab("ops"); }}>
-                <FileSpreadsheet size={14} />
-                <span><b>{task.file_name}</b><small>{task.task_id} · {task.trace_id}</small></span>
-                <em className={`oc-status ${task.status}`}>{statusText[task.status]}</em>
-              </button>
-            ))}
-            {!!traceResult.errors.length && (
-              <div className="oc-table-wrap"><table className="oc-table"><thead><tr><th>任务</th><th>批次</th><th>行号</th><th>字段</th><th>原始值</th><th>错误码</th><th>原因</th><th>建议</th></tr></thead><tbody>
-                {traceResult.errors.map((error, index) => (
-                  <tr key={`${error.task_id}_${error.id ?? index}`}>
-                    <td title={error.task_id}>{error.task_id.slice(5, 13)}…</td><td><code>{error.unit_id}</code></td><td>{error.row_number}</td><td>{error.field_name}</td>
-                    <td>{error.raw_value || "-"}</td><td><code className="oc-code-bad">{error.error_code}</code></td><td>{error.error_reason}</td><td className="oc-advice">{errorAdvice(error.error_code)}</td>
-                  </tr>
-                ))}
-              </tbody></table></div>
-            )}
-            {!traceResult.tasks.length && !traceResult.errors.length && <div className="oc-empty">没有匹配的 Trace 或错误记录</div>}
-          </div>
-        )}
-      </section>
       </>)}
 
       {tab === "ops" && (<>
@@ -437,9 +406,9 @@ export default function ImportTasksPage() {
           <div className="oc-panel-head"><div><b>导入任务</b><span>最近 {tasks.length} 个</span></div><button title="刷新" className="oc-icon-btn" onClick={() => void loadTasks()}><RefreshCw size={13} /></button></div>
           <div className="oc-task-rows">
             {tasks.length === 0 ? <div className="oc-empty">暂无异步任务</div> : tasks.map((task) => (
-              <button key={task.task_id} className={`oc-task-row ${selected?.task_id === task.task_id ? "active" : ""}`} onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
+              <button key={task.task_id} title={`${task.file_name} · ${task.task_id}`} className={`oc-task-row ${selected?.task_id === task.task_id ? "active" : ""}`} onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
                 <FileSpreadsheet size={15} />
-                <span><b>{task.file_name}</b><small>{task.task_id.slice(0, 18)}…</small></span>
+                <span><b>{task.file_name}</b><small>{new Date(task.created_at).toLocaleTimeString("zh-CN", { hour12: false })} · {task.total_rows.toLocaleString()} 行{task.failed_rows > 0 ? ` · 失败 ${task.failed_rows.toLocaleString()}` : ""}</small></span>
                 <em className={`oc-status ${task.status}`}>{statusText[task.status]}</em>
               </button>
             ))}
@@ -499,6 +468,40 @@ export default function ImportTasksPage() {
           </>}
         </section>
       </div>
+
+      <section className="oc-panel">
+        <div className="oc-panel-head"><b>Trace 检索</b><span>按 trace_id / 文件名 / 错误码 / 行号范围定位失败节点，点击结果定位到左侧任务</span><Search size={14} className="oc-panel-icon" /></div>
+        <div className="oc-trace-search">
+          <input placeholder="trace_id" value={traceQuery.trace_id} onChange={(event) => setTraceQuery((q) => ({ ...q, trace_id: event.target.value }))} />
+          <input placeholder="文件名（模糊）" value={traceQuery.file_name} onChange={(event) => setTraceQuery((q) => ({ ...q, file_name: event.target.value }))} />
+          <input placeholder="错误码 E001" value={traceQuery.error_code} onChange={(event) => setTraceQuery((q) => ({ ...q, error_code: event.target.value }))} />
+          <input placeholder="行号从" inputMode="numeric" value={traceQuery.row_from} onChange={(event) => setTraceQuery((q) => ({ ...q, row_from: event.target.value }))} />
+          <input placeholder="行号到" inputMode="numeric" value={traceQuery.row_to} onChange={(event) => setTraceQuery((q) => ({ ...q, row_to: event.target.value }))} />
+          <button className="oc-btn" disabled={traceSearching} onClick={() => void runTraceSearch()}>{traceSearching ? <Loader2 size={13} className="spin" /> : <Search size={13} />}检索</button>
+        </div>
+        {traceResult && (
+          <div className="oc-trace-result">
+            {traceResult.tasks.map((task) => (
+              <button key={task.task_id} className="oc-task-row" onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
+                <FileSpreadsheet size={14} />
+                <span><b>{task.file_name}</b><small>{task.task_id} · {task.trace_id}</small></span>
+                <em className={`oc-status ${task.status}`}>{statusText[task.status]}</em>
+              </button>
+            ))}
+            {!!traceResult.errors.length && (
+              <div className="oc-table-wrap"><table className="oc-table"><thead><tr><th>任务</th><th>批次</th><th>行号</th><th>字段</th><th>原始值</th><th>错误码</th><th>原因</th><th>建议</th></tr></thead><tbody>
+                {traceResult.errors.map((error, index) => (
+                  <tr key={`${error.task_id}_${error.id ?? index}`}>
+                    <td title={error.task_id}>{error.task_id.slice(5, 13)}…</td><td><code>{error.unit_id}</code></td><td>{error.row_number}</td><td>{error.field_name}</td>
+                    <td>{error.raw_value || "-"}</td><td><code className="oc-code-bad">{error.error_code}</code></td><td>{error.error_reason}</td><td className="oc-advice">{errorAdvice(error.error_code)}</td>
+                  </tr>
+                ))}
+              </tbody></table></div>
+            )}
+            {!traceResult.tasks.length && !traceResult.errors.length && <div className="oc-empty">没有匹配的 Trace 或错误记录</div>}
+          </div>
+        )}
+      </section>
       </>)}
     </main>
   );
