@@ -3899,7 +3899,7 @@ textarea:focus {
 .oc-timeline span small { font-size: 11px; color: var(--oc-dim); }
 
 .oc-detail { display: flex; flex-direction: column; }
-.oc-errors { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 560px; }
+.oc-errors { display: flex; flex-direction: column; flex: 0 0 auto; height: 560px; }
 .oc-errors .oc-table-wrap { flex: 1 1 auto; overflow-y: auto; border: 1px solid var(--oc-line); border-radius: 8px; background: #fff; }
 .oc-error-filters { display: flex; gap: 8px; }
 .oc-error-filters input { width: 76px; }

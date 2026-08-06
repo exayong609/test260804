@@ -401,6 +401,40 @@ export default function ImportTasksPage() {
       </section>
       {(notice || loadError) && <div className={`oc-notice ${loadError ? "error" : ""}`}>{loadError || notice}</div>}
 
+      <section className="oc-panel">
+        <div className="oc-panel-head"><b>Trace 检索</b><span>按 trace_id / 文件名 / 错误码 / 行号范围定位失败节点，点击结果定位到下方任务</span><Search size={14} className="oc-panel-icon" /></div>
+        <div className="oc-trace-search">
+          <input placeholder="trace_id" value={traceQuery.trace_id} onChange={(event) => setTraceQuery((q) => ({ ...q, trace_id: event.target.value }))} />
+          <input placeholder="文件名（模糊）" value={traceQuery.file_name} onChange={(event) => setTraceQuery((q) => ({ ...q, file_name: event.target.value }))} />
+          <input placeholder="错误码 E001" value={traceQuery.error_code} onChange={(event) => setTraceQuery((q) => ({ ...q, error_code: event.target.value }))} />
+          <input placeholder="行号从" inputMode="numeric" value={traceQuery.row_from} onChange={(event) => setTraceQuery((q) => ({ ...q, row_from: event.target.value }))} />
+          <input placeholder="行号到" inputMode="numeric" value={traceQuery.row_to} onChange={(event) => setTraceQuery((q) => ({ ...q, row_to: event.target.value }))} />
+          <button className="oc-btn" disabled={traceSearching} onClick={() => void runTraceSearch()}>{traceSearching ? <Loader2 size={13} className="spin" /> : <Search size={13} />}检索</button>
+        </div>
+        {traceResult && (
+          <div className="oc-trace-result">
+            {traceResult.tasks.map((task) => (
+              <button key={task.task_id} className="oc-task-row" onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
+                <FileSpreadsheet size={14} />
+                <span><b>{task.file_name}</b><small>{task.task_id} · {task.trace_id}</small></span>
+                <em className={`oc-status ${task.status}`}>{statusText[task.status]}</em>
+              </button>
+            ))}
+            {!!traceResult.errors.length && (
+              <div className="oc-table-wrap"><table className="oc-table"><thead><tr><th>任务</th><th>批次</th><th>行号</th><th>字段</th><th>原始值</th><th>错误码</th><th>原因</th><th>建议</th></tr></thead><tbody>
+                {traceResult.errors.map((error, index) => (
+                  <tr key={`${error.task_id}_${error.id ?? index}`}>
+                    <td title={error.task_id}>{error.task_id.slice(5, 13)}…</td><td><code>{error.unit_id}</code></td><td>{error.row_number}</td><td>{error.field_name}</td>
+                    <td>{error.raw_value || "-"}</td><td><code className="oc-code-bad">{error.error_code}</code></td><td>{error.error_reason}</td><td className="oc-advice">{errorAdvice(error.error_code)}</td>
+                  </tr>
+                ))}
+              </tbody></table></div>
+            )}
+            {!traceResult.tasks.length && !traceResult.errors.length && <div className="oc-empty">没有匹配的 Trace 或错误记录</div>}
+          </div>
+        )}
+      </section>
+
       <div className="oc-work">
         <section className="oc-panel oc-task-list">
           <div className="oc-panel-head"><div><b>导入任务</b><span>最近 {tasks.length} 个</span></div><button title="刷新" className="oc-icon-btn" onClick={() => void loadTasks()}><RefreshCw size={13} /></button></div>
@@ -468,40 +502,6 @@ export default function ImportTasksPage() {
           </>}
         </section>
       </div>
-
-      <section className="oc-panel">
-        <div className="oc-panel-head"><b>Trace 检索</b><span>按 trace_id / 文件名 / 错误码 / 行号范围定位失败节点，点击结果定位到左侧任务</span><Search size={14} className="oc-panel-icon" /></div>
-        <div className="oc-trace-search">
-          <input placeholder="trace_id" value={traceQuery.trace_id} onChange={(event) => setTraceQuery((q) => ({ ...q, trace_id: event.target.value }))} />
-          <input placeholder="文件名（模糊）" value={traceQuery.file_name} onChange={(event) => setTraceQuery((q) => ({ ...q, file_name: event.target.value }))} />
-          <input placeholder="错误码 E001" value={traceQuery.error_code} onChange={(event) => setTraceQuery((q) => ({ ...q, error_code: event.target.value }))} />
-          <input placeholder="行号从" inputMode="numeric" value={traceQuery.row_from} onChange={(event) => setTraceQuery((q) => ({ ...q, row_from: event.target.value }))} />
-          <input placeholder="行号到" inputMode="numeric" value={traceQuery.row_to} onChange={(event) => setTraceQuery((q) => ({ ...q, row_to: event.target.value }))} />
-          <button className="oc-btn" disabled={traceSearching} onClick={() => void runTraceSearch()}>{traceSearching ? <Loader2 size={13} className="spin" /> : <Search size={13} />}检索</button>
-        </div>
-        {traceResult && (
-          <div className="oc-trace-result">
-            {traceResult.tasks.map((task) => (
-              <button key={task.task_id} className="oc-task-row" onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
-                <FileSpreadsheet size={14} />
-                <span><b>{task.file_name}</b><small>{task.task_id} · {task.trace_id}</small></span>
-                <em className={`oc-status ${task.status}`}>{statusText[task.status]}</em>
-              </button>
-            ))}
-            {!!traceResult.errors.length && (
-              <div className="oc-table-wrap"><table className="oc-table"><thead><tr><th>任务</th><th>批次</th><th>行号</th><th>字段</th><th>原始值</th><th>错误码</th><th>原因</th><th>建议</th></tr></thead><tbody>
-                {traceResult.errors.map((error, index) => (
-                  <tr key={`${error.task_id}_${error.id ?? index}`}>
-                    <td title={error.task_id}>{error.task_id.slice(5, 13)}…</td><td><code>{error.unit_id}</code></td><td>{error.row_number}</td><td>{error.field_name}</td>
-                    <td>{error.raw_value || "-"}</td><td><code className="oc-code-bad">{error.error_code}</code></td><td>{error.error_reason}</td><td className="oc-advice">{errorAdvice(error.error_code)}</td>
-                  </tr>
-                ))}
-              </tbody></table></div>
-            )}
-            {!traceResult.tasks.length && !traceResult.errors.length && <div className="oc-empty">没有匹配的 Trace 或错误记录</div>}
-          </div>
-        )}
-      </section>
       </>)}
     </main>
   );
