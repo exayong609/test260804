@@ -136,6 +136,7 @@ export default function ImportTasksPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [tab, setTab] = useState<"ops" | "monitor">("ops");
   const clock = useClock();
 
   const selected = useMemo(() => tasks.find((task) => task.task_id === selectedId) ?? tasks[0], [tasks, selectedId]);
@@ -277,6 +278,12 @@ export default function ImportTasksPage() {
 
       {monitorDown && <div className="oc-alert"><AlertTriangle size={14} /><b>红色告警</b>监控数据源不可用：队列或数据库连接异常，请立即检查 Worker 与数据库状态。</div>}
 
+      <nav className="oc-tabs">
+        <button className={`oc-tab ${tab === "ops" ? "active" : ""}`} onClick={() => setTab("ops")}><UploadCloud size={13} />导入操作</button>
+        <button className={`oc-tab ${tab === "monitor" ? "active" : ""}`} onClick={() => setTab("monitor")}><Activity size={13} />监控大盘</button>
+      </nav>
+
+      {tab === "monitor" && (<>
       <section className="oc-kpis">
         <div className="oc-kpi">
           <small><Activity size={12} />实时吞吐</small>
@@ -366,7 +373,7 @@ export default function ImportTasksPage() {
             {(monitor?.errors ?? []).map((item) => {
               const maxCount = Math.max(...(monitor?.errors ?? [{ count: 1 }]).map((entry) => entry.count), 1);
               return (
-                <button key={item.error_code} className="oc-errdist-row" title={`筛选 ${item.error_code} 错误明细`} onClick={() => { setErrorCode(item.error_code); setErrorPage(1); }}>
+                <button key={item.error_code} className="oc-errdist-row" title={`筛选 ${item.error_code} 错误明细`} onClick={() => { setErrorCode(item.error_code); setErrorPage(1); setTab("ops"); }}>
                   <code>{item.error_code}</code>
                   <span className="oc-errdist-bar"><i style={{ width: `${Math.max(3, item.count / maxCount * 100)}%` }} /></span>
                   <b>{item.count.toLocaleString()}</b>
@@ -391,7 +398,7 @@ export default function ImportTasksPage() {
         {traceResult && (
           <div className="oc-trace-result">
             {traceResult.tasks.map((task) => (
-              <button key={task.task_id} className="oc-task-row" onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
+              <button key={task.task_id} className="oc-task-row" onClick={() => { setSelectedId(task.task_id); setErrorPage(1); setTab("ops"); }}>
                 <FileSpreadsheet size={14} />
                 <span><b>{task.file_name}</b><small>{task.task_id} · {task.trace_id}</small></span>
                 <em className={`oc-status ${task.status}`}>{statusText[task.status]}</em>
@@ -411,7 +418,9 @@ export default function ImportTasksPage() {
           </div>
         )}
       </section>
+      </>)}
 
+      {tab === "ops" && (<>
       <section className="oc-upload">
         <label className="oc-file-picker">
           <UploadCloud size={16} />
@@ -490,6 +499,7 @@ export default function ImportTasksPage() {
           </>}
         </section>
       </div>
+      </>)}
     </main>
   );
 }

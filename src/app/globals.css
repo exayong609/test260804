@@ -3926,3 +3926,13 @@ textarea:focus {
   .oc-counts { grid-template-columns: repeat(3, 1fr); }
   .oc-errors { height: 560px; }
 }
+/* tabs */
+.oc-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--oc-line); }
+.oc-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px; font-size: 13px; color: var(--oc-dim);
+  background: none; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; margin-bottom: -1px;
+}
+.oc-tab:hover { color: var(--oc-teal-dark); }
+.oc-tab.active { color: var(--oc-teal-dark); border-bottom-color: var(--oc-teal); font-weight: 600; }
