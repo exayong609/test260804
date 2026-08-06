@@ -3848,7 +3848,7 @@ textarea:focus {
 .oc-task-row span b { display: block; font-size: 12px; color: var(--oc-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .oc-task-row span small { font-family: var(--oc-mono); font-size: 10px; }
 .oc-task-row.active { border-color: var(--oc-teal); background: var(--oc-teal-soft); }
-.oc-task-row:hover { border-color: var(--oc-teal); }
+.oc-task-row:hover { border-color: var(--oc-teal); background: var(--oc-teal-soft); }
 
 .oc-status { font-style: normal; font-family: var(--oc-mono); font-size: 10px; padding: 3px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
 .oc-status.pending { color: #86909c; border-color: #c9cdd4; background: #f7f8fa; }
@@ -3905,7 +3905,7 @@ textarea:focus {
   background: #fff; border: 1px solid var(--oc-line); color: var(--oc-text);
   border-radius: 6px; padding: 5px 10px; font-size: 11px; cursor: pointer;
 }
-.oc-pagination button:hover:not(:disabled) { border-color: var(--oc-teal); color: var(--oc-teal-dark); }
+.oc-pagination button:hover:not(:disabled) { border-color: var(--oc-teal); color: var(--oc-teal-dark); background: var(--oc-teal-soft); }
 .oc-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .ops-console .spin { animation: oc-spin 0.9s linear infinite; }
@@ -3934,5 +3934,5 @@ textarea:focus {
   background: none; border: none; border-bottom: 2px solid transparent;
   cursor: pointer; margin-bottom: -1px;
 }
-.oc-tab:hover { color: var(--oc-teal-dark); }
+.oc-tab:hover { color: var(--oc-teal-dark); background: none; }
 .oc-tab.active { color: var(--oc-teal-dark); border-bottom-color: var(--oc-teal); font-weight: 600; }
