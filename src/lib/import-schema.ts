@@ -38,6 +38,7 @@ async function initializeImportSchema() {
     )
   `;
   await sql`create index if not exists idx_import_tasks_status_created on import_tasks(status, created_at desc)`;
+  await sql`create index if not exists idx_import_tasks_file_hash on import_tasks(file_hash)`;
   await sql`
     create table if not exists import_files (
       task_id text primary key references import_tasks(id) on delete cascade,

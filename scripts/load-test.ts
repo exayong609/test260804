@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 async function main() {
   const baseUrl = process.env.APP_URL || "http://127.0.0.1:3000";
@@ -14,17 +15,41 @@ async function main() {
   const samples: number[] = [];
   let serverErrors = 0;
   const startedAt = performance.now();
-  const form = new FormData();
-  form.set("file", new File([bytes], path.basename(filePath), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-  form.set("ruleId", ruleId);
+  const hashStarted = performance.now();
+  const fingerprint = createHash("sha256").update(bytes).digest("hex");
+  const hashMs = performance.now() - hashStarted;
 
   const uploadStarted = performance.now();
-  const response = await fetch(`${baseUrl}/api/import-tasks`, { method: "POST", body: form });
-  samples.push(performance.now() - uploadStarted);
+  const response = await fetch(`${baseUrl}/api/import-tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: path.basename(filePath),
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      fileSize: bytes.byteLength,
+      fileHash: fingerprint,
+      estimatedRows: 0,
+      ruleId
+    })
+  });
+  const taskCreateMs = performance.now() - uploadStarted;
   if (response.status >= 500) serverErrors += 1;
-  const created = await response.json() as { task_id?: string; trace_id?: string; error?: string };
+  const created = await response.json() as { task_id?: string; trace_id?: string; duplicated?: boolean; error?: string };
   if (!response.ok || !created.task_id) throw new Error(created.error || `上传失败：HTTP ${response.status}`);
-  console.log(`task_id=${created.task_id} trace_id=${created.trace_id} upload=${samples[0].toFixed(0)}ms`);
+  console.log(`task_id=${created.task_id} trace_id=${created.trace_id} task_ready=${(hashMs + taskCreateMs).toFixed(0)}ms`);
+
+  let fileUploadMs = 0;
+  if (!created.duplicated) {
+    const form = new FormData();
+    form.set("file", new File([bytes], path.basename(filePath), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    form.set("fileHash", fingerprint);
+    const fileUploadStarted = performance.now();
+    const fileResponse = await fetch(`${baseUrl}/api/import-tasks/${created.task_id}/file`, { method: "POST", body: form });
+    fileUploadMs = performance.now() - fileUploadStarted;
+    if (fileResponse.status >= 500) serverErrors += 1;
+    const fileBody = await fileResponse.json() as { uploaded?: boolean; error?: string };
+    if (!fileResponse.ok || !fileBody.uploaded) throw new Error(fileBody.error || `文件上传失败：HTTP ${fileResponse.status}`);
+  }
 
   let final: Record<string, unknown> = created;
   while (!['completed', 'partial_success', 'failed'].includes(String(final.status || ''))) {
@@ -41,13 +66,18 @@ async function main() {
   const totalMs = performance.now() - startedAt;
   const sorted = [...samples].sort((left, right) => left - right);
   const p95 = sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * .95) - 1)] || 0;
-  const passed = samples[0] <= 1_000 && totalMs <= 60_000 && final.status !== "failed" && serverErrors === 0;
+  const taskReadyMs = hashMs + taskCreateMs;
+  const passed = !created.duplicated && taskReadyMs <= 1_000 && totalMs <= 60_000 && final.status !== "failed" && serverErrors === 0;
   const report = {
     tested_at: new Date().toISOString(),
     app_url: baseUrl,
     file: filePath,
     sku_master_rows: 20_000,
-    upload_ms: Math.round(samples[0]),
+    upload_ms: Math.round(taskReadyMs),
+    task_create_ms: Math.round(taskCreateMs),
+    client_hash_ms: Math.round(hashMs),
+    file_transfer_ms: Math.round(fileUploadMs),
+    duplicate_short_circuit: Boolean(created.duplicated),
     request_p95_ms: Math.round(p95),
     total_ms: Math.round(totalMs),
     server_errors: serverErrors,

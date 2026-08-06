@@ -87,10 +87,13 @@ npm run demo:rules
 
 访问 `/import-tasks` 可创建异步导入任务并查看进度、行级错误、批次性能和 Trace。该链路复用现有文件解析器与规则引擎，并通过 PostgreSQL Transactional Outbox + BullMQ Worker 执行。
 
+异步上传采用两阶段协议：浏览器计算 SHA-256 后，任务创建接口只写任务、Outbox 和 Trace 并立即返回 `task_id`；原文件在第二个请求中上传，落库后才激活 Outbox。这样任务返回时间不受 1.5MB 文件传输和跨区 `bytea` 写入影响，同时保留文件指纹校验和重复上传去重。
+
 ```bash
 npm run seed:loadtest  # 20,000 SKU + 10,000 行 Excel
 npm run worker         # 常驻消费者与 Outbox Dispatcher
 npm run loadtest       # 上传、轮询、60 秒目标判定
+npm test               # 关键链路与架构契约测试
 ```
 
 架构、幂等、降级和部署边界详见 `docs/async-import-architecture.md`。

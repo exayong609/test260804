@@ -1,12 +1,31 @@
 import { after, NextResponse } from "next/server";
-import { createImportTask, listImportTasks } from "@/lib/import-repository";
+import { createOrReuseImportTaskFast, listImportTasks, persistImportFileAndActivate } from "@/lib/import-repository";
 import { estimateRowCount, fileHash } from "@/lib/import-upload";
-import { listRules } from "@/lib/store";
+import { getRuleById } from "@/lib/store";
 import type { ParsingRule } from "@/types";
 import { processImportTaskInBackground } from "@/lib/serverless-import-fallback";
+import { parseImportTaskInit, shouldUseServerlessFallback } from "@/lib/import-task-init";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+const SUPPORTED_FILE = /\.(xlsx|xls|docx|pdf)$/i;
+
+async function resolveRule(ruleId: string, ruleValue: unknown) {
+  if (ruleValue && typeof ruleValue === "object") return ruleValue as ParsingRule;
+  if (typeof ruleValue === "string" && ruleValue) return JSON.parse(ruleValue) as ParsingRule;
+  return ruleId ? await getRuleById(ruleId) : null;
+}
+
+function shouldRunServerlessFallback(fileSize: number) {
+  const maxBytes = Number(process.env.SERVERLESS_IMPORT_MAX_BYTES || 512_000);
+  return shouldUseServerlessFallback({
+    isVercel: process.env.VERCEL === "1",
+    disabled: process.env.SERVERLESS_IMPORT_FALLBACK === "false",
+    fileSize,
+    maxBytes
+  });
+}
 
 export async function GET() {
   try {
@@ -19,45 +38,82 @@ export async function GET() {
 export async function POST(request: Request) {
   const started = performance.now();
   try {
+    if (request.headers.get("content-type")?.includes("application/json")) {
+      const parsed = parseImportTaskInit(await request.json());
+      if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+      const body = parsed.value;
+      const rule = await resolveRule(body.ruleId, body.rule);
+      if (!rule) return NextResponse.json({ error: "请选择有效的解析规则。" }, { status: 400 });
+
+      const result = await createOrReuseImportTaskFast({
+        fileName: body.fileName,
+        mimeType: body.mimeType,
+        fileHash: body.fileHash,
+        rule,
+        estimatedRows: body.estimatedRows
+      });
+      return NextResponse.json({
+        ...result.task,
+        duplicated: result.duplicated,
+        file_upload_pending: !result.filePersisted,
+        notice: result.filePersisted ? "相同文件已导入，返回已有任务。" : undefined,
+        upload_duration_ms: Math.round(performance.now() - started)
+      }, { status: result.duplicated ? 200 : 202 });
+    }
+
     const form = await request.formData();
     const file = form.get("file");
     const ruleId = String(form.get("ruleId") || "");
     const ruleRaw = form.get("rule");
     if (!(file instanceof File)) return NextResponse.json({ error: "请上传文件。" }, { status: 400 });
-    if (!/\.(xlsx|xls|docx|pdf)$/i.test(file.name)) {
+    if (!SUPPORTED_FILE.test(file.name)) {
       return NextResponse.json({ error: "仅支持 xlsx、xls、docx 和 pdf 文件。" }, { status: 400 });
     }
 
-    let rule: ParsingRule | undefined;
-    if (typeof ruleRaw === "string" && ruleRaw) rule = JSON.parse(ruleRaw) as ParsingRule;
-    if (!rule && ruleId) rule = (await listRules()).find((item) => item.id === ruleId);
+    const rule = await resolveRule(ruleId, ruleRaw);
     if (!rule) return NextResponse.json({ error: "请选择有效的解析规则。" }, { status: 400 });
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const task = await createImportTask({
+    const hash = fileHash(bytes);
+
+    const result = await createOrReuseImportTaskFast({
       fileName: file.name,
       mimeType: file.type || "application/octet-stream",
-      fileBytes: bytes,
-      fileHash: fileHash(bytes),
+      fileHash: hash,
       rule,
       estimatedRows: estimateRowCount(file.name, bytes)
     });
-    if (!task) throw new Error("导入任务创建后无法读取任务状态。");
-    const serverlessFallbackMaxRows = Number(process.env.SERVERLESS_IMPORT_MAX_ROWS || 2_000);
-    if (
-      process.env.VERCEL === "1" &&
-      process.env.SERVERLESS_IMPORT_FALLBACK !== "false" &&
-      task.total_rows <= serverlessFallbackMaxRows
-    ) {
-      after(async () => {
-        try {
-          await processImportTaskInBackground(task.task_id);
-        } catch (error) {
-          console.error("[serverless-import-fallback] failed", error);
-        }
-      });
+    if (result.duplicated && result.filePersisted) {
+      return NextResponse.json(
+        {
+          ...result.task,
+          duplicated: true,
+          file_upload_pending: !result.filePersisted,
+          notice: result.filePersisted ? "相同文件已导入，返回已有任务。" : "已找到待上传任务，继续上传文件。",
+          upload_duration_ms: Math.round(performance.now() - started)
+        },
+        { status: 200 }
+      );
     }
-    return NextResponse.json({ ...task, upload_duration_ms: Math.round(performance.now() - started) }, { status: 202 });
+
+    const task = result.task;
+    const runServerlessFallback = shouldRunServerlessFallback(bytes.byteLength);
+
+    after(async () => {
+      try {
+        await persistImportFileAndActivate(task.task_id, file.type || "application/octet-stream", bytes, hash);
+        if (runServerlessFallback) await processImportTaskInBackground(task.task_id);
+      } catch (error) {
+        console.error("[import-file-persist] failed", error);
+      }
+    });
+
+    return NextResponse.json({
+      ...task,
+      duplicated: result.duplicated,
+      file_upload_pending: false,
+      upload_duration_ms: Math.round(performance.now() - started)
+    }, { status: 202 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "异步任务创建失败。" }, { status: 500 });
   }

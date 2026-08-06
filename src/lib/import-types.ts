@@ -12,6 +12,8 @@ export type ImportTaskCreateInput = {
   estimatedRows: number;
 };
 
+export type ImportTaskInitInput = Omit<ImportTaskCreateInput, "fileBytes">;
+
 export type ImportTaskSnapshot = {
   task_id: string;
   trace_id: string;
@@ -46,6 +48,11 @@ export type ParsedTaskPayload = {
   rule: ParsingRule;
 };
 
+export type ParsedTaskLookup =
+  | { kind: "ready"; payload: ParsedTaskPayload }
+  | { kind: "file-pending"; taskId: string; traceId: string }
+  | { kind: "missing" };
+
 export type ImportBatchPayload = {
   task_id: string;
   unit_id: string;
@@ -53,6 +60,8 @@ export type ImportBatchPayload = {
   start_row: number;
   end_row: number;
   trace_id: string;
+  parse_duration_ms?: number;
+  rule_duration_ms?: number;
 };
 
 export type ImportRowRecord = {
