@@ -8,6 +8,7 @@ import type {
   ImportTaskCreateInput,
   ImportTaskSnapshot,
   OutboxRecord,
+  ParsedTaskLookup,
   ParsedTaskPayload
 } from "@/lib/import-types";
 import { toImportErrorRecord } from "@/lib/import-types";
@@ -106,6 +107,74 @@ export async function createImportTask(input: ImportTaskCreateInput) {
   return getImportTask(taskId);
 }
 
+export async function findTaskByFileHash(fileHash: string): Promise<ImportTaskSnapshot | null> {
+  if (!fileHash) return null;
+  await ensureImportSchema();
+  const sql = requireSql();
+  const rows = await sql<Parameters<typeof mapTask>[0][]>`
+    select id, trace_id, file_name, status, total_rows, processed_rows, success_rows,
+      failed_rows, total_batches, completed_batches, degraded, created_at, completed_at
+    from import_tasks where file_hash = ${fileHash} order by created_at desc limit 1
+  `;
+  return rows[0] ? mapTask(rows[0]) : null;
+}
+
+export async function createImportTaskFast(input: ImportTaskCreateInput): Promise<ImportTaskSnapshot> {
+  await ensureImportSchema();
+  const sql = requireSql();
+  const taskId = `task_${randomUUID()}`;
+  const traceId = `trace_${randomUUID()}`;
+  const eventId = `evt_${randomUUID()}`;
+  const totalBatches = input.estimatedRows > 0 ? Math.ceil(input.estimatedRows / batchSize()) : 0;
+
+  const rows = await sql<{ created_at: Date }[]>`
+    with new_task as (
+      insert into import_tasks (
+        id, file_name, file_hash, status, total_rows, total_batches, trace_id, rule_payload
+      ) values (
+        ${taskId}, ${input.fileName}, ${input.fileHash}, 'pending', ${input.estimatedRows},
+        ${totalBatches}, ${traceId}, ${sql.json(input.rule)}
+      )
+      returning created_at
+    ), new_outbox as (
+      insert into event_outbox (id, aggregate_id, event_type, trace_id, payload)
+      select ${eventId}, ${taskId}, 'ImportTaskCreated', ${traceId},
+        ${sql.json({ task_id: taskId, trace_id: traceId })}
+    ), new_trace as (
+      insert into trace_events (trace_id, task_id, event_name, event_status, message, metadata)
+      select ${traceId}, ${taskId}, 'ImportTaskCreated', 'success',
+        '上传接口已在同一事务创建任务和 Outbox 事件，文件异步持久化',
+        ${sql.json({ estimated_rows: input.estimatedRows, file_hash: input.fileHash, deferred_file: true })}
+    )
+    select created_at from new_task
+  `;
+
+  return {
+    task_id: taskId,
+    trace_id: traceId,
+    file_name: input.fileName,
+    status: "pending",
+    total_rows: input.estimatedRows,
+    processed_rows: 0,
+    success_rows: 0,
+    failed_rows: 0,
+    total_batches: totalBatches,
+    completed_batches: 0,
+    degraded: false,
+    created_at: rows[0]?.created_at.toISOString() ?? new Date().toISOString()
+  };
+}
+
+export async function persistImportFile(taskId: string, mimeType: string, fileBytes: Uint8Array) {
+  const sql = requireSql();
+  await sql`
+    insert into import_files (task_id, mime_type, content, size_bytes)
+    values (${taskId}, ${mimeType}, ${fileBytes}, ${fileBytes.byteLength})
+    on conflict (task_id) do update set
+      mime_type = excluded.mime_type, content = excluded.content, size_bytes = excluded.size_bytes
+  `;
+}
+
 export async function getImportTask(taskId: string): Promise<ImportTaskSnapshot | null> {
   await ensureImportSchema();
   const sql = requireSql();
@@ -129,31 +198,40 @@ export async function listImportTasks(limit = 50): Promise<ImportTaskSnapshot[]>
 }
 
 export async function getParsedTaskPayload(taskId: string): Promise<ParsedTaskPayload | null> {
+  const lookup = await getParsedTaskLookup(taskId);
+  return lookup.kind === "ready" ? lookup.payload : null;
+}
+
+export async function getParsedTaskLookup(taskId: string): Promise<ParsedTaskLookup> {
   await ensureImportSchema();
   const sql = requireSql();
   const rows = await sql<{
     id: string;
     trace_id: string;
     file_name: string;
-    mime_type: string;
-    content: Uint8Array;
+    mime_type: string | null;
+    content: Uint8Array | null;
     rule_payload: ParsedTaskPayload["rule"];
   }[]>`
     select t.id, t.trace_id, t.file_name, f.mime_type, f.content, t.rule_payload
     from import_tasks t
-    join import_files f on f.task_id = t.id
+    left join import_files f on f.task_id = t.id
     where t.id = ${taskId}
     limit 1
   `;
   const row = rows[0];
-  if (!row) return null;
+  if (!row) return { kind: "missing" };
+  if (!row.content || !row.mime_type) return { kind: "file-pending", taskId: row.id, traceId: row.trace_id };
   return {
-    taskId: row.id,
-    traceId: row.trace_id,
-    fileName: row.file_name,
-    mimeType: row.mime_type,
-    fileBytes: row.content,
-    rule: row.rule_payload
+    kind: "ready",
+    payload: {
+      taskId: row.id,
+      traceId: row.trace_id,
+      fileName: row.file_name,
+      mimeType: row.mime_type,
+      fileBytes: row.content,
+      rule: row.rule_payload
+    }
   };
 }
 
@@ -169,7 +247,9 @@ export async function persistParsedRows(taskId: string, traceId: string, rows: P
       unit_id: `unit_${String(units.length + 1).padStart(4, "0")}`,
       batch_index: units.length + 1,
       start_row: index + 1,
-      end_row: Math.min(rows.length, index + size)
+      end_row: Math.min(rows.length, index + size),
+      parse_duration_ms: parseDurationMs,
+      rule_duration_ms: ruleDurationMs
     });
   }
 
@@ -445,6 +525,14 @@ export async function completeBatch(input: {
   });
 }
 
+export async function recordInsertDuration(taskId: string, unitId: string, insertDurationMs: number) {
+  const sql = requireSql();
+  await sql`
+    update batch_performance_log set insert_duration_ms = ${insertDurationMs}
+    where task_id = ${taskId} and unit_id = ${unitId}
+  `;
+}
+
 export async function failBatch(taskId: string, unitId: string, traceId: string, error: string, maxRetries = 3) {
   const sql = requireSql();
   return sql.begin(async (tx) => {
@@ -545,14 +633,24 @@ export async function getTraceEvents(traceId: string) {
 export async function monitorSummary() {
   await ensureImportSchema();
   const sql = requireSql();
-  const [throughput, queue, latency, errors] = await Promise.all([
+  const [throughput, throughputSeries, queue, latency, errors, slowBatches] = await Promise.all([
     sql`select coalesce(sum(result_success_rows), 0)::int as rows from import_task_batches where completed_at >= now() - interval '1 minute'`,
+    sql`
+      select to_char(date_trunc('minute', completed_at), 'YYYY-MM-DD"T"HH24:MI') as minute,
+        coalesce(sum(result_success_rows), 0)::int as rows
+      from import_task_batches
+      where completed_at >= now() - interval '5 minutes'
+      group by 1 order by 1
+    `,
     sql`select status, count(*)::int as units, coalesce(sum(end_row - start_row + 1), 0)::int as rows from import_task_batches group by status`,
     sql`
       select
         percentile_cont(0.5) within group (order by parse_duration_ms)::int as parse_p50,
         percentile_cont(0.95) within group (order by parse_duration_ms)::int as parse_p95,
         percentile_cont(0.99) within group (order by parse_duration_ms)::int as parse_p99,
+        percentile_cont(0.5) within group (order by rule_duration_ms)::int as rule_p50,
+        percentile_cont(0.95) within group (order by rule_duration_ms)::int as rule_p95,
+        percentile_cont(0.99) within group (order by rule_duration_ms)::int as rule_p99,
         percentile_cont(0.5) within group (order by validate_duration_ms)::int as validate_p50,
         percentile_cont(0.95) within group (order by validate_duration_ms)::int as validate_p95,
         percentile_cont(0.99) within group (order by validate_duration_ms)::int as validate_p99,
@@ -561,14 +659,25 @@ export async function monitorSummary() {
         percentile_cont(0.99) within group (order by insert_duration_ms)::int as insert_p99
       from batch_performance_log where created_at >= now() - interval '1 hour'
     `,
-    sql`select error_code, count(*)::int as count from import_task_errors where created_at >= now() - interval '1 hour' group by error_code order by count desc`
+    sql`select error_code, count(*)::int as count from import_task_errors where created_at >= now() - interval '1 hour' group by error_code order by count desc`,
+    sql`
+      select p.task_id, t.file_name, p.unit_id, p.batch_index, p.validate_duration_ms,
+        p.insert_duration_ms, p.total_duration_ms, p.status, p.created_at
+      from batch_performance_log p
+      left join import_tasks t on t.id = p.task_id
+      where p.created_at >= now() - interval '24 hours'
+      order by p.total_duration_ms desc
+      limit 10
+    `
   ]);
   return {
     generated_at: new Date().toISOString(),
     throughput_per_minute: Number(throughput[0]?.rows ?? 0),
+    throughput_series: throughputSeries,
     queue,
     latency: latency[0] ?? {},
-    errors
+    errors,
+    slow_batches: slowBatches.map((row) => ({ ...row, created_at: row.created_at.toISOString() }))
   };
 }
 
@@ -581,6 +690,63 @@ export async function recoverStuckBatches() {
     where status = 'processing' and locked_at < now() - interval '5 minutes'
     returning task_id, unit_id
   `;
+}
+
+export type TraceSearchOptions = {
+  taskId?: string;
+  traceId?: string;
+  fileName?: string;
+  batchIndex?: number;
+  rowFrom?: number;
+  rowTo?: number;
+  errorCode?: string;
+  limit?: number;
+};
+
+export async function searchTraceEvents(options: TraceSearchOptions) {
+  await ensureImportSchema();
+  const sql = requireSql();
+  const limit = Math.max(1, Math.min(options.limit ?? 50, 200));
+
+  const tasks = await sql<Parameters<typeof mapTask>[0][]>`
+    select id, trace_id, file_name, status, total_rows, processed_rows, success_rows,
+      failed_rows, total_batches, completed_batches, degraded, created_at, completed_at
+    from import_tasks
+    where (${options.taskId ?? ""} = '' or id = ${options.taskId ?? ""})
+      and (${options.traceId ?? ""} = '' or trace_id = ${options.traceId ?? ""})
+      and (${options.fileName ?? ""} = '' or file_name ilike ${"%" + (options.fileName ?? "") + "%"})
+    order by created_at desc limit 20
+  `;
+  const traceIds = tasks.map((task) => task.trace_id);
+  const taskIds = tasks.map((task) => task.id);
+
+  const events = traceIds.length
+    ? await sql<{ occurred_at: Date }[]>`
+      select event_name, event_status, task_id, unit_id, message, metadata, occurred_at
+      from trace_events
+      where trace_id = any(${sql.array(traceIds)})
+      order by occurred_at desc limit ${limit}
+    `
+    : [];
+
+  const errors = taskIds.length
+    ? await sql<{ created_at: Date }[]>`
+      select task_id, unit_id, batch_index, row_number, field_name, raw_value, error_code, error_reason, trace_id, created_at
+      from import_task_errors
+      where task_id = any(${sql.array(taskIds)})
+        and (${options.batchIndex ?? 0} = 0 or batch_index = ${options.batchIndex ?? 0})
+        and (${options.errorCode ?? ""} = '' or error_code = ${options.errorCode ?? ""})
+        and (${options.rowFrom ?? 0} = 0 or row_number >= ${options.rowFrom ?? 0})
+        and (${options.rowTo ?? 0} = 0 or row_number <= ${options.rowTo ?? 0})
+      order by row_number limit ${limit}
+    `
+    : [];
+
+  return {
+    tasks: tasks.map(mapTask),
+    events: events.map((row) => ({ ...row, occurred_at: row.occurred_at.toISOString() })),
+    errors: errors.map((row) => ({ ...row, created_at: row.created_at.toISOString() }))
+  };
 }
 
 export async function retryFailedBatches(taskId: string) {

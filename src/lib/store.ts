@@ -285,6 +285,19 @@ export async function listRules(): Promise<ParsingRule[]> {
   return withDefaultRules(rules);
 }
 
+export async function getRuleById(id: string): Promise<ParsingRule | null> {
+  const builtIn = DEFAULT_RULES.find((rule) => rule.id === id);
+  if (builtIn) return builtIn;
+  const sql = getSql();
+  if (sql) {
+    await ensureSchema();
+    const rows = await sql<{ payload: ParsingRule }[]>`select payload from parsing_rules where id = ${id} limit 1`;
+    return rows[0]?.payload ?? null;
+  }
+  const rules = (await readLocal()).rules;
+  return rules.find((rule) => rule.id === id) ?? null;
+}
+
 export async function saveRule(rule: ParsingRule) {
   const sql = getSql();
   const updatedRule = { ...rule, updatedAt: new Date().toISOString() };

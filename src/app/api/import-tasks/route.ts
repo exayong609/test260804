@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
-import { createImportTask, listImportTasks } from "@/lib/import-repository";
+import { createImportTaskFast, findTaskByFileHash, listImportTasks, persistImportFile } from "@/lib/import-repository";
 import { estimateRowCount, fileHash } from "@/lib/import-upload";
-import { listRules } from "@/lib/store";
+import { getRuleById } from "@/lib/store";
 import type { ParsingRule } from "@/types";
 import { processImportTaskInBackground } from "@/lib/serverless-import-fallback";
 
@@ -30,33 +30,44 @@ export async function POST(request: Request) {
 
     let rule: ParsingRule | undefined;
     if (typeof ruleRaw === "string" && ruleRaw) rule = JSON.parse(ruleRaw) as ParsingRule;
-    if (!rule && ruleId) rule = (await listRules()).find((item) => item.id === ruleId);
+    if (!rule && ruleId) rule = (await getRuleById(ruleId)) ?? undefined;
     if (!rule) return NextResponse.json({ error: "请选择有效的解析规则。" }, { status: 400 });
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const task = await createImportTask({
+    const hash = fileHash(bytes);
+
+    const duplicate = await findTaskByFileHash(hash);
+    if (duplicate) {
+      return NextResponse.json(
+        { ...duplicate, duplicated: true, notice: "相同文件已导入，返回已有任务。" },
+        { status: 200 }
+      );
+    }
+
+    const task = await createImportTaskFast({
       fileName: file.name,
       mimeType: file.type || "application/octet-stream",
       fileBytes: bytes,
-      fileHash: fileHash(bytes),
+      fileHash: hash,
       rule,
       estimatedRows: estimateRowCount(file.name, bytes)
     });
-    if (!task) throw new Error("导入任务创建后无法读取任务状态。");
+
     const serverlessFallbackMaxRows = Number(process.env.SERVERLESS_IMPORT_MAX_ROWS || 2_000);
-    if (
+    const runServerlessFallback =
       process.env.VERCEL === "1" &&
       process.env.SERVERLESS_IMPORT_FALLBACK !== "false" &&
-      task.total_rows <= serverlessFallbackMaxRows
-    ) {
-      after(async () => {
-        try {
-          await processImportTaskInBackground(task.task_id);
-        } catch (error) {
-          console.error("[serverless-import-fallback] failed", error);
-        }
-      });
-    }
+      task.total_rows <= serverlessFallbackMaxRows;
+
+    after(async () => {
+      try {
+        await persistImportFile(task.task_id, file.type || "application/octet-stream", bytes);
+        if (runServerlessFallback) await processImportTaskInBackground(task.task_id);
+      } catch (error) {
+        console.error("[import-file-persist] failed", error);
+      }
+    });
+
     return NextResponse.json({ ...task, upload_duration_ms: Math.round(performance.now() - started) }, { status: 202 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "异步任务创建失败。" }, { status: 500 });
