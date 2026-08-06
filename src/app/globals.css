@@ -3622,8 +3622,11 @@ textarea:focus {
 }
 
 .async-chart { color: #0f766e; padding: 4px 0; }
-.async-chart svg { width: 100%; height: auto; display: block; }
-.async-chart text { fill: #64748b; }
+.async-chart svg { width: 100%; height: 112px; display: block; }
+.async-chart-axis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); color: #64748b; font-size: 10px; }
+.async-chart-axis span { text-align: center; }
+.async-chart-axis span:first-child { text-align: left; }
+.async-chart-axis span:last-child { text-align: right; }
 .async-chart-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 11px; color: #64748b; }
 
 .async-error-dist { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -3655,6 +3658,6 @@ textarea:focus {
 .async-pagination button {
   display: inline-flex; align-items: center; gap: 4px;
   border: 1px solid #e2e8f0; border-radius: 8px; background: #fff;
-  padding: 5px 10px; font-size: 12px; cursor: pointer;
+  padding: 5px 10px; color: #475569; font-size: 12px; cursor: pointer;
 }
-.async-pagination button:disabled { opacity: 0.45; cursor: not-allowed; }
+.async-pagination button:disabled { color: #94a3b8; opacity: 0.65; cursor: not-allowed; }

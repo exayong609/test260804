@@ -452,18 +452,16 @@ export default function ImportTasksPage() {
 function ThroughputChart({ series }: { series: Array<{ minute: string; rows: number }> }) {
   if (!series.length) return <div className="async-empty compact">近 5 分钟暂无入库数据</div>;
   const width = 560;
-  const height = 120;
+  const height = 104;
   const max = Math.max(...series.map((point) => point.rows), 1);
-  const step = series.length > 1 ? width / (series.length - 1) : 0;
-  const points = series.map((point, index) => `${Math.round(index * step)},${height - Math.round(point.rows / max * (height - 24))}`);
+  const step = series.length > 1 ? (width - 8) / (series.length - 1) : 0;
+  const points = series.map((point, index) => `${Math.round(4 + index * step)},${Math.round(8 + (1 - point.rows / max) * (height - 20))}`);
   return (
     <div className="async-chart">
-      <svg viewBox={`0 0 ${width} ${height + 18}`} role="img" aria-label="近 5 分钟吞吐趋势">
-        <polyline points={points.join(" ")} fill="none" stroke="currentColor" strokeWidth="2" />
-        {series.map((point, index) => (
-          <text key={point.minute} x={Math.round(index * step)} y={height + 14} textAnchor="middle" fontSize="10">{point.minute.slice(11)}</text>
-        ))}
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="近 5 分钟吞吐趋势">
+        <polyline points={points.join(" ")} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" />
       </svg>
+      <div className="async-chart-axis">{series.map((point) => <span key={point.minute}>{point.minute.slice(11)}</span>)}</div>
       <div className="async-chart-legend">{series.map((point) => <span key={point.minute}>{point.minute.slice(11)}：{point.rows.toLocaleString()} 行</span>)}</div>
     </div>
   );
