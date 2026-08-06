@@ -26,6 +26,7 @@ export type ImportTaskSnapshot = {
   degraded: boolean;
   created_at: string;
   completed_at?: string;
+  duplicated?: boolean;
 };
 
 export type OutboxRecord = {

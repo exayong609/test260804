@@ -127,27 +127,55 @@ export async function createImportTaskFast(input: ImportTaskCreateInput): Promis
   const eventId = `evt_${randomUUID()}`;
   const totalBatches = input.estimatedRows > 0 ? Math.ceil(input.estimatedRows / batchSize()) : 0;
 
-  const rows = await sql<{ created_at: Date }[]>`
-    with new_task as (
+  const rows = await sql<{ dup: Record<string, unknown> | null; created_at: Date | null }[]>`
+    with existing as (
+      select id, trace_id, file_name, status, total_rows, processed_rows, success_rows,
+        failed_rows, total_batches, completed_batches, degraded, created_at, completed_at
+      from import_tasks where file_hash = ${input.fileHash} order by created_at desc limit 1
+    ), new_task as (
       insert into import_tasks (
         id, file_name, file_hash, status, total_rows, total_batches, trace_id, rule_payload
-      ) values (
-        ${taskId}, ${input.fileName}, ${input.fileHash}, 'pending', ${input.estimatedRows},
-        ${totalBatches}, ${traceId}, ${sql.json(input.rule)}
       )
+      select ${taskId}, ${input.fileName}, ${input.fileHash}, 'pending', ${input.estimatedRows},
+        ${totalBatches}, ${traceId}, ${sql.json(input.rule)}
+      where not exists (select 1 from existing)
       returning created_at
     ), new_outbox as (
       insert into event_outbox (id, aggregate_id, event_type, trace_id, payload)
       select ${eventId}, ${taskId}, 'ImportTaskCreated', ${traceId},
         ${sql.json({ task_id: taskId, trace_id: traceId })}
+      where not exists (select 1 from existing)
     ), new_trace as (
       insert into trace_events (trace_id, task_id, event_name, event_status, message, metadata)
       select ${traceId}, ${taskId}, 'ImportTaskCreated', 'success',
         '上传接口已在同一事务创建任务和 Outbox 事件，文件异步持久化',
         ${sql.json({ estimated_rows: input.estimatedRows, file_hash: input.fileHash, deferred_file: true })}
+      where not exists (select 1 from existing)
     )
-    select created_at from new_task
+    select
+      (select row_to_json(e) from existing e) as dup,
+      (select created_at from new_task) as created_at
   `;
+
+  const dup = rows[0]?.dup as Parameters<typeof mapTask>[0] | null;
+  if (dup) {
+    return {
+      task_id: String(dup.id),
+      trace_id: String(dup.trace_id),
+      file_name: String(dup.file_name),
+      status: dup.status as ImportTaskSnapshot["status"],
+      total_rows: Number(dup.total_rows),
+      processed_rows: Number(dup.processed_rows),
+      success_rows: Number(dup.success_rows),
+      failed_rows: Number(dup.failed_rows),
+      total_batches: Number(dup.total_batches),
+      completed_batches: Number(dup.completed_batches),
+      degraded: Boolean(dup.degraded),
+      created_at: new Date(String(dup.created_at)).toISOString(),
+      completed_at: dup.completed_at ? new Date(String(dup.completed_at)).toISOString() : undefined,
+      duplicated: true
+    };
+  }
 
   return {
     task_id: taskId,
@@ -161,7 +189,7 @@ export async function createImportTaskFast(input: ImportTaskCreateInput): Promis
     total_batches: totalBatches,
     completed_batches: 0,
     degraded: false,
-    created_at: rows[0]?.created_at.toISOString() ?? new Date().toISOString()
+    created_at: rows[0]?.created_at?.toISOString() ?? new Date().toISOString()
   };
 }
 
