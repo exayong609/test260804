@@ -1108,7 +1108,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: 310px minmax(0, 1fr);
   gap: 12px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .async-task-list,
@@ -1120,9 +1120,9 @@ textarea:focus {
 }
 
 .async-task-list {
-  height: auto;
-  min-height: 560px;
-  max-height: none;
+  height: 604px;
+  min-height: 604px;
+  max-height: 604px;
   overflow: auto;
   scrollbar-gutter: stable;
 }
@@ -1210,7 +1210,15 @@ textarea:focus {
 .async-status.partial_success { color: #a75e17; background: #fff1df; }
 .async-status.failed { color: #ae2735; background: #fdebed; }
 
-.async-detail { min-width: 0; min-height: 560px; padding: 16px; }
+.async-detail {
+  min-width: 0;
+  height: 604px;
+  min-height: 604px;
+  max-height: 604px;
+  overflow: auto;
+  padding: 16px;
+  scrollbar-gutter: stable;
+}
 .async-detail-empty {
   display: grid;
   min-height: 526px;
@@ -3919,7 +3927,8 @@ textarea:focus {
 
 @media (max-width: 1000px) {
   .async-fault-grid { grid-template-columns: 1fr; }
-  .async-detail { min-height: 900px; }
+  .async-task-list,
+  .async-detail { height: 900px; min-height: 900px; max-height: 900px; }
   .async-trace-search { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
@@ -3927,6 +3936,7 @@ textarea:focus {
   .async-monitor-grid { grid-template-columns: 1fr; }
   .async-trace-search { grid-template-columns: 1fr 1fr; }
   .async-trace-search button { width: 100%; }
-  .async-detail { min-height: 0; }
+  .async-task-list { height: 290px; min-height: 290px; max-height: 290px; }
+  .async-detail { height: auto; min-height: 0; max-height: none; overflow: visible; }
   .async-fault-grid > .async-data-block { height: 330px; }
 }
