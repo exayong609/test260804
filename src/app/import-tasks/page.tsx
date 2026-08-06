@@ -131,6 +131,7 @@ export default function ImportTasksPage() {
   const [monitor, setMonitor] = useState<Monitor | null>(null);
   const [monitorDown, setMonitorDown] = useState(false);
   const [traceQuery, setTraceQuery] = useState({ trace_id: "", file_name: "", error_code: "", row_from: "", row_to: "" });
+  const [detailTab, setDetailTab] = useState<"batches" | "trace">("trace");
   const [traceResult, setTraceResult] = useState<TraceSearchResult | null>(null);
   const [traceSearching, setTraceSearching] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -442,7 +443,7 @@ export default function ImportTasksPage() {
             {tasks.length === 0 ? <div className="oc-empty">暂无异步任务</div> : tasks.map((task) => (
               <button key={task.task_id} title={`${task.file_name} · ${task.task_id}`} className={`oc-task-row ${selected?.task_id === task.task_id ? "active" : ""}`} onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
                 <FileSpreadsheet size={15} />
-                <span><b>{task.file_name}</b><small>#{task.task_id.slice(5, 12)} · {new Date(task.created_at).toLocaleTimeString("zh-CN", { hour12: false })} · {task.total_rows.toLocaleString()} 行{task.failed_rows > 0 ? ` · 失败 ${task.failed_rows.toLocaleString()}` : ""}</small></span>
+                <span><b>{task.file_name}</b><small>#{task.task_id.slice(5, 12)} · {new Date(task.created_at).toLocaleTimeString("zh-CN", { hour12: false, hour: "2-digit", minute: "2-digit" })} · {task.total_rows.toLocaleString()} 行{task.failed_rows > 0 ? ` · 失败 ${task.failed_rows.toLocaleString()}` : ""}</small></span>
                 <em className={`oc-status ${task.status}`}>{statusText[task.status]}</em>
               </button>
             ))}
@@ -473,32 +474,39 @@ export default function ImportTasksPage() {
               <Count label="完成批次" value={`${selected.completed_batches}/${selected.total_batches}`} />
             </div>
 
-            <div className="oc-detail-grid">
-              <div className="oc-subpanel">
+            <div className="oc-tabs oc-detail-tabs">
+              <button className={`oc-tab ${detailTab === "trace" ? "active" : ""}`} onClick={() => setDetailTab("trace")}><Network size={13} />Trace 与行级错误</button>
+              <button className={`oc-tab ${detailTab === "batches" ? "active" : ""}`} onClick={() => setDetailTab("batches")}><Clock3 size={13} />批次性能</button>
+            </div>
+
+            {detailTab === "batches" ? (
+              <div className="oc-subpanel oc-fill">
                 <div className="oc-subpanel-head"><div><b>批次性能</b><span>独立重试、独立计时</span></div><Clock3 size={13} /></div>
                 <div className="oc-table-wrap"><table className="oc-table"><thead><tr><th>批次</th><th>范围</th><th>状态</th><th>校验</th><th>写入</th><th>总耗时</th><th>重试</th></tr></thead><tbody>{batches.map((batch) => <tr key={batch.unit_id}><td><code>{batch.unit_id}</code></td><td>{batch.start_row}-{batch.end_row}</td><td>{batch.status}</td><td>{batch.validate_duration_ms ?? "-"}ms</td><td>{batch.insert_duration_ms ?? "-"}ms</td><td><b>{batch.total_duration_ms ?? "-"}ms</b></td><td>{batch.retry_count}</td></tr>)}</tbody></table></div>
               </div>
-              <div className="oc-subpanel">
-                <div className="oc-subpanel-head"><div><b>Trace 时间线</b><span>API → Outbox → Queue → Worker → DB</span></div><Network size={13} /></div>
-                <div className="oc-timeline">{trace.map((event, index) => <div key={`${event.occurred_at}_${index}`} className={event.event_status}><i /><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN", { hour12: false })}</time><span><b>{event.event_name}</b><small>{event.unit_id ? `${event.unit_id} · ` : ""}{event.message}</small></span></div>)}</div>
-              </div>
-            </div>
-
-            <div className="oc-subpanel oc-errors">
-              <div className="oc-subpanel-head">
-                <div><b>行级错误</b><span>原始值已脱敏 · 共 {errorTotal.toLocaleString()} 条</span></div>
-                <div className="oc-error-filters">
-                  <select value={errorCode} onChange={(event) => { setErrorCode(event.target.value); setErrorPage(1); }}><option value="">全部错误</option><option value="E001">E001 SKU 不存在</option><option value="E002">E002 必填缺失</option><option value="E003">E003 电话格式</option><option value="E004">E004 数量非法</option><option value="E005">E005 外部编码重复</option><option value="W001">W001 降级未校验</option></select>
-                  <input placeholder="批次号" inputMode="numeric" value={errorBatch} onChange={(event) => { setErrorBatch(event.target.value); setErrorPage(1); }} />
+            ) : (
+              <div className="oc-trace-errors">
+                <div className="oc-subpanel">
+                  <div className="oc-subpanel-head"><div><b>Trace 时间线</b><span>API → Outbox → Queue → Worker → DB</span></div><Network size={13} /></div>
+                  <div className="oc-timeline">{trace.map((event, index) => <div key={`${event.occurred_at}_${index}`} className={event.event_status}><i /><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN", { hour12: false })}</time><span><b>{event.event_name}</b><small>{event.unit_id ? `${event.unit_id} · ` : ""}{event.message}</small></span></div>)}</div>
+                </div>
+                <div className="oc-subpanel oc-errors">
+                  <div className="oc-subpanel-head">
+                    <div><b>行级错误</b><span>原始值已脱敏 · 共 {errorTotal.toLocaleString()} 条</span></div>
+                    <div className="oc-error-filters">
+                      <select value={errorCode} onChange={(event) => { setErrorCode(event.target.value); setErrorPage(1); }}><option value="">全部错误</option><option value="E001">E001 SKU 不存在</option><option value="E002">E002 必填缺失</option><option value="E003">E003 电话格式</option><option value="E004">E004 数量非法</option><option value="E005">E005 外部编码重复</option><option value="W001">W001 降级未校验</option></select>
+                      <input placeholder="批次号" inputMode="numeric" value={errorBatch} onChange={(event) => { setErrorBatch(event.target.value); setErrorPage(1); }} />
+                    </div>
+                  </div>
+                  <div className="oc-table-wrap"><table className="oc-table"><thead><tr><th>批次</th><th>行号</th><th>字段</th><th>原始值</th><th>错误码</th><th>原因</th><th>建议</th></tr></thead><tbody>{errors.map((error) => <tr key={error.id}><td><code>{error.unit_id}</code></td><td>{error.row_number}</td><td>{error.field_name}</td><td>{error.raw_value || "-"}</td><td><code className="oc-code-bad">{error.error_code}</code></td><td>{error.error_reason}</td><td className="oc-advice">{errorAdvice(error.error_code)}</td></tr>)}</tbody></table>{!errors.length && <div className="oc-empty compact">当前筛选下没有错误</div>}</div>
+                  <div className="oc-pagination">
+                    <button disabled={errorPage <= 1} onClick={() => setErrorPage((page) => Math.max(1, page - 1))}><ChevronLeft size={12} />上一页</button>
+                    <span>{errorPage} / {errorPages}</span>
+                    <button disabled={errorPage >= errorPages} onClick={() => setErrorPage((page) => Math.min(errorPages, page + 1))}>下一页<ChevronRight size={12} /></button>
+                  </div>
                 </div>
               </div>
-              <div className="oc-table-wrap"><table className="oc-table"><thead><tr><th>批次</th><th>行号</th><th>字段</th><th>原始值</th><th>错误码</th><th>原因</th><th>建议</th></tr></thead><tbody>{errors.map((error) => <tr key={error.id}><td><code>{error.unit_id}</code></td><td>{error.row_number}</td><td>{error.field_name}</td><td>{error.raw_value || "-"}</td><td><code className="oc-code-bad">{error.error_code}</code></td><td>{error.error_reason}</td><td className="oc-advice">{errorAdvice(error.error_code)}</td></tr>)}</tbody></table>{!errors.length && <div className="oc-empty compact">当前筛选下没有错误</div>}</div>
-              <div className="oc-pagination">
-                <button disabled={errorPage <= 1} onClick={() => setErrorPage((page) => Math.max(1, page - 1))}><ChevronLeft size={12} />上一页</button>
-                <span>{errorPage} / {errorPages}</span>
-                <button disabled={errorPage >= errorPages} onClick={() => setErrorPage((page) => Math.min(errorPages, page + 1))}>下一页<ChevronRight size={12} /></button>
-              </div>
-            </div>
+            )}
           </>}
         </section>
       </div>
