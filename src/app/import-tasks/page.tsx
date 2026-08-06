@@ -129,6 +129,7 @@ export default function ImportTasksPage() {
   const [traceResult, setTraceResult] = useState<TraceSearchResult | null>(null);
   const [traceSearching, setTraceSearching] = useState(false);
   const [activeTab, setActiveTab] = useState<"work" | "monitor">("work");
+  const [detailTab, setDetailTab] = useState<"batch" | "fault">("fault");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [loadError, setLoadError] = useState("");
@@ -262,7 +263,15 @@ export default function ImportTasksPage() {
     if (![...query.keys()].length) return;
     setTraceSearching(true);
     try {
-      setTraceResult(await readJson<TraceSearchResult>(await fetch(`/api/traces?${query}`, { cache: "no-store" })));
+      const result = await readJson<TraceSearchResult>(await fetch(`/api/traces?${query}`, { cache: "no-store" }));
+      setTraceResult(result);
+      if (result.tasks[0]) {
+        setSelectedId(result.tasks[0].task_id);
+        setErrorCode(traceQuery.error_code.trim());
+        setErrorBatch(traceQuery.batch.trim());
+        setErrorPage(1);
+        setDetailTab("fault");
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Trace 检索失败。");
     } finally {
@@ -316,12 +325,11 @@ export default function ImportTasksPage() {
         <Metric icon={<AlertTriangle size={16} />} label="错误类型" value={String(monitor?.errors.length ?? 0)} unit="类" warning={Boolean(monitor?.errors.length)} />
       </section>
 
-      <section className="async-data-block">
-        <div className="async-section-head"><div><b>吞吐趋势（近 5 分钟）</b><span>按分钟聚合成功入库行数</span></div><Activity size={15} /></div>
-        <ThroughputChart series={monitor?.throughput_series ?? []} />
-      </section>
-
-      <section className="async-detail-grid">
+      <section className="async-monitor-grid">
+        <div className="async-data-block">
+          <div className="async-section-head"><div><b>吞吐趋势（近 5 分钟）</b><span>按分钟聚合成功入库行数</span></div><Activity size={15} /></div>
+          <ThroughputChart series={monitor?.throughput_series ?? []} />
+        </div>
         <div className="async-data-block">
           <div className="async-section-head"><div><b>阶段耗时分布（近 1 小时）</b><span>P50 / P95 / P99，定位瓶颈阶段</span></div><Gauge size={15} /></div>
           <div className="async-table-wrap"><table><thead><tr><th>阶段</th><th>P50</th><th>P95</th><th>P99</th></tr></thead><tbody>
@@ -350,129 +358,147 @@ export default function ImportTasksPage() {
             {!monitor?.slow_batches?.length && <tr><td colSpan={5}>近 24 小时暂无批次性能数据</td></tr>}
           </tbody></table></div>
         </div>
+        <div className="async-data-block">
+          <div className="async-section-head"><div><b>错误类型分布（近 1 小时）</b><span>点击错误码联动到任务错误明细</span></div><AlertTriangle size={15} /></div>
+          <div className="async-error-dist">
+            {(monitor?.errors ?? []).map((item) => (
+              <button key={item.error_code} title={`筛选 ${item.error_code} 错误明细`} onClick={() => { setErrorCode(item.error_code); setErrorPage(1); setDetailTab("fault"); setActiveTab("work"); }}>
+                <code>{item.error_code}</code><b>{item.count.toLocaleString()}</b>
+              </button>
+            ))}
+            {!monitor?.errors?.length && <span className="async-empty compact">近 1 小时暂无错误</span>}
+          </div>
+        </div>
       </section>
-
-          <section className="async-data-block">
-            <div className="async-section-head"><div><b>错误类型分布（近 1 小时）</b><span>点击错误码跳转到明细筛选</span></div><AlertTriangle size={15} /></div>
-            <div className="async-error-dist">
-              {(monitor?.errors ?? []).map((item) => (
-                <button key={item.error_code} title={`筛选 ${item.error_code} 错误明细`} onClick={() => { setErrorCode(item.error_code); setErrorPage(1); setActiveTab("work"); }}>
-                  <code>{item.error_code}</code><b>{item.count.toLocaleString()}</b>
-                </button>
-              ))}
-              {!monitor?.errors?.length && <span className="async-empty compact">近 1 小时暂无错误</span>}
-            </div>
-          </section>
         </div>
       ) : (
         <div id="work-panel" className="async-tab-panel" role="tabpanel" aria-labelledby="work-tab">
-
-      <section className="async-data-block async-trace-block">
-        <div className="async-section-head"><div><b>Trace 检索</b><span>按 trace_id / 文件名 / 错误码 / 行号范围定位失败节点</span></div><Search size={15} /></div>
-        <div className="async-trace-search">
-          <input placeholder="task_id" value={traceQuery.task_id} onChange={(event) => setTraceQuery((q) => ({ ...q, task_id: event.target.value }))} />
-          <input placeholder="trace_id" value={traceQuery.trace_id} onChange={(event) => setTraceQuery((q) => ({ ...q, trace_id: event.target.value }))} />
-          <input placeholder="文件名（模糊）" value={traceQuery.file_name} onChange={(event) => setTraceQuery((q) => ({ ...q, file_name: event.target.value }))} />
-          <input placeholder="批次号" inputMode="numeric" value={traceQuery.batch} onChange={(event) => setTraceQuery((q) => ({ ...q, batch: event.target.value }))} />
-          <input placeholder="错误码，如 E001" value={traceQuery.error_code} onChange={(event) => setTraceQuery((q) => ({ ...q, error_code: event.target.value }))} />
-          <input placeholder="行号从" inputMode="numeric" value={traceQuery.row_from} onChange={(event) => setTraceQuery((q) => ({ ...q, row_from: event.target.value }))} />
-          <input placeholder="行号到" inputMode="numeric" value={traceQuery.row_to} onChange={(event) => setTraceQuery((q) => ({ ...q, row_to: event.target.value }))} />
-          <button className="primary" disabled={traceSearching} onClick={() => void runTraceSearch()}>{traceSearching ? <Loader2 size={13} className="spin" /> : <Search size={13} />}检索</button>
-        </div>
-        {traceResult && (
-          <div className="async-trace-result">
-            {traceResult.tasks.map((task) => (
-              <button key={task.task_id} className="async-task-row" onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
-                <FileSpreadsheet size={15} />
-                <span><b>{task.file_name}</b><small>{task.task_id} · {task.trace_id}</small></span>
-                <em className={`async-status ${task.status}`}>{statusText[task.status]}</em>
-              </button>
-            ))}
-            {!!traceResult.events.length && (
-              <div className="async-timeline async-search-events">
-                {traceResult.events.map((event, index) => <div key={`${event.occurred_at}_${index}`}><i className={event.event_status} /><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN", { hour12: false })}</time><span><b>{event.event_name}</b><small>{event.unit_id ? `${event.unit_id} · ` : ""}{event.message}</small></span></div>)}
-              </div>
-            )}
-            {!!traceResult.errors.length && (
-              <div className="async-table-wrap"><table><thead><tr><th>任务</th><th>批次</th><th>行号</th><th>字段</th><th>原始值</th><th>错误码</th><th>原因</th><th>建议</th></tr></thead><tbody>
-                {traceResult.errors.map((error, index) => (
-                  <tr key={`${error.task_id}_${error.id ?? index}`}>
-                    <td>{error.task_id.slice(0, 14)}…</td><td>{error.unit_id}</td><td>{error.row_number}</td><td>{error.field_name}</td>
-                    <td>{error.raw_value || "-"}</td><td><code>{error.error_code}</code></td><td>{error.error_reason}</td><td>{errorAdvice(error.error_code)}</td>
-                  </tr>
-                ))}
-              </tbody></table></div>
-            )}
-            {!traceResult.tasks.length && !traceResult.errors.length && <div className="async-empty compact">没有匹配的 Trace 或错误记录</div>}
-          </div>
-        )}
-      </section>
-
-      <section className="async-upload-band">
-        <label className="async-file-picker">
-          <UploadCloud size={18} />
-          <span>{file?.name || "选择 Excel、Word 或 PDF 文件"}</span>
-          <input type="file" accept=".xlsx,.xls,.docx,.pdf" onChange={(event) => {
-            const nextFile = event.target.files?.[0] || null;
-            const request = ++fingerprintRequest.current;
-            setFile(nextFile);
-            setFileFingerprint("");
-            if (nextFile) {
-              void sha256Blob(nextFile).then((hash) => {
-                if (request === fingerprintRequest.current) setFileFingerprint(hash);
-              }).catch(() => {
-                if (request === fingerprintRequest.current) setNotice("文件指纹计算失败，请重新选择文件。");
-              });
-            }
-          }} />
-        </label>
-        <label className="async-rule-select"><span>解析规则</span><select value={ruleId} onChange={(event) => setRuleId(event.target.value)}><option value="">请选择规则</option>{rules.map((rule) => <option key={rule.id} value={rule.id}>{rule.name}</option>)}</select></label>
-        <button className="primary async-create" aria-busy={busy || Boolean(file && !fileFingerprint)} disabled={!file || !ruleId || !fileFingerprint || busy} onClick={() => void createTask()}>{busy ? <Loader2 size={15} className="spin" /> : <UploadCloud size={15} />}创建异步任务</button>
-      </section>
-      {(notice || loadError) && <div className={`async-notice ${loadError ? "error" : ""}`}>{loadError || notice}</div>}
-
-      <div className="async-workspace">
-        <section className="async-task-list">
-          <div className="async-section-head"><div><b>导入任务</b><span>最近 {tasks.length} 个任务</span></div><button title="刷新" onClick={() => void loadTasks()}><RefreshCw size={14} /></button></div>
-          {tasks.length === 0 ? <div className="async-empty">暂无异步任务</div> : tasks.map((task) => (
-            <button key={task.task_id} className={`async-task-row ${selected?.task_id === task.task_id ? "active" : ""}`} onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
-              <FileSpreadsheet size={17} />
-              <span><b>{task.file_name}</b><small>{task.task_id.slice(0, 18)}…</small></span>
-              <em className={`async-status ${task.status}`}>{statusText[task.status]}</em>
-            </button>
-          ))}
-        </section>
-
-        <section className="async-detail">
-          {!selected ? <div className="async-empty">选择任务查看处理详情</div> : <>
-            <div className="async-detail-head"><div><span className={`async-status ${selected.status}`}>{statusText[selected.status]}</span><h2>{selected.file_name}</h2><p>{selected.task_id} · {selected.trace_id}</p></div><div className="async-detail-actions"><strong>{progress}%</strong><button onClick={() => void retryFailed()} disabled={selected.failed_rows === 0}><RefreshCw size={13} />重试失败批次</button><Link href={`/api/import-tasks/${selected.task_id}/errors/export`}><FileSpreadsheet size={13} />导出错误</Link></div></div>
-            {selected.degraded && <div className="async-degraded"><AlertTriangle size={15} />SKU 校验已降级：本次导入未经过商品主数据完整校验，需要后续复核。</div>}
-            <div className="async-progress"><span style={{ width: `${progress}%` }} /></div>
-            <div className="async-counts"><Count label="总行数" value={selected.total_rows} /><Count label="已处理" value={selected.processed_rows} /><Count label="成功" value={selected.success_rows} ok /><Count label="失败" value={selected.failed_rows} warn /><Count label="完成批次" value={`${selected.completed_batches}/${selected.total_batches}`} /></div>
-
-            <div className="async-detail-grid">
-              <div className="async-data-block"><div className="async-section-head"><div><b>批次性能</b><span>每个处理单元独立重试、独立计时</span></div><Clock3 size={15} /></div><div className="async-table-wrap"><table><thead><tr><th>批次</th><th>范围</th><th>状态</th><th>校验</th><th>写入</th><th>总耗时</th><th>重试</th></tr></thead><tbody>{batches.map((batch) => <tr key={batch.unit_id}><td>{batch.unit_id}</td><td>{batch.start_row}-{batch.end_row}</td><td>{batch.status}</td><td>{batch.validate_duration_ms ?? "-"}ms</td><td>{batch.insert_duration_ms ?? "-"}ms</td><td>{batch.total_duration_ms ?? "-"}ms</td><td>{batch.retry_count}</td></tr>)}</tbody></table></div></div>
-              <div className="async-data-block"><div className="async-section-head"><div><b>Trace 时间线</b><span>API → Outbox → Queue → Worker → DB</span></div><Network size={15} /></div><div className="async-timeline">{trace.map((event, index) => <div key={`${event.occurred_at}_${index}`}><i className={event.event_status} /><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN", { hour12: false })}</time><span><b>{event.event_name}</b><small>{event.unit_id ? `${event.unit_id} · ` : ""}{event.message}</small></span></div>)}</div></div>
+          <section className="async-upload-band">
+            <label className="async-file-picker">
+              <UploadCloud size={18} />
+              <span>{file?.name || "选择 Excel、Word 或 PDF 文件"}</span>
+              <input type="file" accept=".xlsx,.xls,.docx,.pdf" onChange={(event) => {
+                const nextFile = event.target.files?.[0] || null;
+                const request = ++fingerprintRequest.current;
+                setFile(nextFile);
+                setFileFingerprint("");
+                setNotice("");
+                if (nextFile) {
+                  void sha256Blob(nextFile).then((hash) => {
+                    if (request === fingerprintRequest.current) setFileFingerprint(hash);
+                  }).catch(() => {
+                    if (request === fingerprintRequest.current) setNotice("文件指纹计算失败，请重新选择文件。");
+                  });
+                }
+              }} />
+            </label>
+            <label className="async-rule-select"><span>解析规则</span><select value={ruleId} onChange={(event) => setRuleId(event.target.value)}><option value="">请选择规则</option>{rules.map((rule) => <option key={rule.id} value={rule.id}>{rule.name}</option>)}</select></label>
+            <button className="primary async-create" aria-busy={busy || Boolean(file && !fileFingerprint)} disabled={!file || !ruleId || !fileFingerprint || busy} onClick={() => void createTask()}>{busy ? <Loader2 size={15} className="spin" /> : <UploadCloud size={15} />}创建异步任务</button>
+            <div className={`async-upload-status ${loadError || notice.includes("失败") ? "error" : ""}`} aria-live="polite">
+              {loadError || notice || (busy ? "正在创建异步任务" : file ? (fileFingerprint ? "文件已就绪，可以创建任务" : "正在计算文件指纹") : "选择文件和解析规则后创建任务")}
             </div>
+          </section>
 
-            <div className="async-data-block async-errors">
-              <div className="async-section-head">
-                <div><b>行级错误</b><span>原始值已按字段类型脱敏，共 {errorTotal.toLocaleString()} 条</span></div>
-                <div className="async-error-filters">
-                  <label><Search size={13} /><select value={errorCode} onChange={(event) => { setErrorCode(event.target.value); setErrorPage(1); }}><option value="">全部错误</option><option value="E001">E001 SKU 不存在</option><option value="E002">E002 必填缺失</option><option value="E003">E003 电话格式</option><option value="E004">E004 数量非法</option><option value="E005">E005 外部编码重复</option><option value="W001">W001 降级未校验</option></select></label>
-                  <input placeholder="批次号" inputMode="numeric" value={errorBatch} onChange={(event) => { setErrorBatch(event.target.value); setErrorPage(1); }} />
+          <section className="async-data-block async-trace-block">
+            <div className="async-section-head"><div><b>故障定位</b><span>全局检索任务，命中后联动下方 Trace 与行级错误</span></div><Search size={15} /></div>
+            <div className="async-trace-search">
+              <input placeholder="task_id" value={traceQuery.task_id} onChange={(event) => setTraceQuery((q) => ({ ...q, task_id: event.target.value }))} />
+              <input placeholder="trace_id" value={traceQuery.trace_id} onChange={(event) => setTraceQuery((q) => ({ ...q, trace_id: event.target.value }))} />
+              <input placeholder="文件名（模糊）" value={traceQuery.file_name} onChange={(event) => setTraceQuery((q) => ({ ...q, file_name: event.target.value }))} />
+              <input placeholder="批次号" inputMode="numeric" value={traceQuery.batch} onChange={(event) => setTraceQuery((q) => ({ ...q, batch: event.target.value }))} />
+              <input placeholder="错误码，如 E001" value={traceQuery.error_code} onChange={(event) => setTraceQuery((q) => ({ ...q, error_code: event.target.value }))} />
+              <input placeholder="行号从" inputMode="numeric" value={traceQuery.row_from} onChange={(event) => setTraceQuery((q) => ({ ...q, row_from: event.target.value }))} />
+              <input placeholder="行号到" inputMode="numeric" value={traceQuery.row_to} onChange={(event) => setTraceQuery((q) => ({ ...q, row_to: event.target.value }))} />
+              <button className="primary" disabled={traceSearching} onClick={() => void runTraceSearch()}>{traceSearching ? <Loader2 size={13} className="spin" /> : <Search size={13} />}检索</button>
+            </div>
+            {traceResult && (
+              <details className="async-trace-result">
+                <summary>检索结果：{traceResult.tasks.length} 个任务，{traceResult.events.length} 个事件，{traceResult.errors.length} 条行级错误<span>展开精确命中</span></summary>
+                <div className="async-trace-result-body">
+                  {traceResult.tasks.map((task) => (
+                    <button key={task.task_id} className="async-task-row" onClick={() => {
+                      setSelectedId(task.task_id);
+                      setErrorCode(traceQuery.error_code.trim());
+                      setErrorBatch(traceQuery.batch.trim());
+                      setErrorPage(1);
+                      setDetailTab("fault");
+                    }}>
+                      <FileSpreadsheet size={15} />
+                      <span><b>{task.file_name}</b><small>{task.task_id} · {task.trace_id}</small></span>
+                      <em className={`async-status ${task.status}`}>{statusText[task.status]}</em>
+                    </button>
+                  ))}
+                  {!!traceResult.errors.length && (
+                    <div className="async-table-wrap"><table><thead><tr><th>任务</th><th>批次</th><th>行号</th><th>字段</th><th>原始值</th><th>错误码</th><th>原因</th><th>建议</th></tr></thead><tbody>
+                      {traceResult.errors.map((error, index) => (
+                        <tr key={`${error.task_id}_${error.id ?? index}`}>
+                          <td>{error.task_id.slice(0, 14)}…</td><td>{error.unit_id}</td><td>{error.row_number}</td><td>{error.field_name}</td>
+                          <td>{error.raw_value || "-"}</td><td><code>{error.error_code}</code></td><td>{error.error_reason}</td><td>{errorAdvice(error.error_code)}</td>
+                        </tr>
+                      ))}
+                    </tbody></table></div>
+                  )}
+                  {!traceResult.tasks.length && !traceResult.errors.length && <div className="async-empty compact">没有匹配的 Trace 或错误记录</div>}
                 </div>
-              </div>
-              <div className="async-table-wrap"><table><thead><tr><th>批次</th><th>行号</th><th>字段</th><th>原始值</th><th>错误码</th><th>原因</th><th>建议</th></tr></thead><tbody>{errors.map((error) => <tr key={error.id}><td>{error.unit_id}</td><td>{error.row_number}</td><td>{error.field_name}</td><td>{error.raw_value || "-"}</td><td><code>{error.error_code}</code></td><td>{error.error_reason}</td><td>{errorAdvice(error.error_code)}</td></tr>)}</tbody></table>{!errors.length && <div className="async-empty compact">当前筛选下没有错误</div>}</div>
-              <div className="async-pagination">
-                <button disabled={errorPage <= 1} onClick={() => setErrorPage((page) => Math.max(1, page - 1))}><ChevronLeft size={13} />上一页</button>
-                <span>第 {errorPage} / {errorPages} 页</span>
-                <button disabled={errorPage >= errorPages} onClick={() => setErrorPage((page) => Math.min(errorPages, page + 1))}>下一页<ChevronRight size={13} /></button>
-              </div>
-            </div>
-          </>}
-        </section>
-      </div>
+              </details>
+            )}
+          </section>
+
+          <div className="async-workspace">
+            <section className="async-task-list">
+              <div className="async-section-head"><div><b>导入任务</b><span>最近 {tasks.length} 个任务 · 固定高度滚动</span></div><button title="刷新" aria-label="刷新任务列表" onClick={() => void loadTasks()}><RefreshCw size={14} /></button></div>
+              {tasks.length === 0 ? <div className="async-empty async-task-empty">暂无异步任务</div> : tasks.map((task) => (
+                <button key={task.task_id} className={`async-task-row ${selected?.task_id === task.task_id ? "active" : ""}`} onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
+                  <FileSpreadsheet size={17} />
+                  <span><b>{task.file_name}</b><small>{task.task_id.slice(0, 18)}…</small></span>
+                  <em className={`async-status ${task.status}`}>{statusText[task.status]}</em>
+                </button>
+              ))}
+            </section>
+
+            <section className="async-detail">
+              {!selected ? <div className="async-empty async-detail-empty">选择任务查看处理详情</div> : <>
+                <div className="async-detail-head"><div><span className={`async-status ${selected.status}`}>{statusText[selected.status]}</span><h2>{selected.file_name}</h2><p>{selected.task_id} · {selected.trace_id}</p></div><div className="async-detail-actions"><strong>{progress}%</strong><button onClick={() => void retryFailed()} disabled={selected.failed_rows === 0}><RefreshCw size={13} />重试失败批次</button><Link href={`/api/import-tasks/${selected.task_id}/errors/export`}><FileSpreadsheet size={13} />导出错误</Link></div></div>
+                {selected.degraded && <div className="async-degraded"><AlertTriangle size={15} />SKU 校验已降级：本次导入未经过商品主数据完整校验，需要后续复核。</div>}
+                <div className="async-progress"><span style={{ width: `${progress}%` }} /></div>
+                <div className="async-counts"><Count label="总行数" value={selected.total_rows} /><Count label="已处理" value={selected.processed_rows} /><Count label="成功" value={selected.success_rows} ok /><Count label="失败" value={selected.failed_rows} warn /><Count label="完成批次" value={`${selected.completed_batches}/${selected.total_batches}`} /></div>
+
+                <nav className="async-detail-tabs" role="tablist" aria-label="任务详情视图">
+                  <button role="tab" aria-selected={detailTab === "batch"} className={detailTab === "batch" ? "active" : ""} onClick={() => setDetailTab("batch")}><Clock3 size={13} />批次性能</button>
+                  <button role="tab" aria-selected={detailTab === "fault"} className={detailTab === "fault" ? "active" : ""} onClick={() => setDetailTab("fault")}><Network size={13} />Trace 与行级错误</button>
+                </nav>
+
+                {detailTab === "batch" ? (
+                  <div className="async-data-block async-batch-panel">
+                    <div className="async-section-head"><div><b>批次性能</b><span>每个处理单元独立重试、独立计时</span></div><Clock3 size={15} /></div>
+                    <div className="async-table-wrap"><table><thead><tr><th>批次</th><th>范围</th><th>状态</th><th>校验</th><th>写入</th><th>总耗时</th><th>重试</th></tr></thead><tbody>{batches.map((batch) => <tr key={batch.unit_id}><td>{batch.unit_id}</td><td>{batch.start_row}-{batch.end_row}</td><td>{batch.status}</td><td>{batch.validate_duration_ms ?? "-"}ms</td><td>{batch.insert_duration_ms ?? "-"}ms</td><td>{batch.total_duration_ms ?? "-"}ms</td><td>{batch.retry_count}</td></tr>)}</tbody></table>{!batches.length && <div className="async-empty compact">当前任务暂无批次性能数据</div>}</div>
+                  </div>
+                ) : (
+                  <div className="async-fault-grid">
+                    <div className="async-data-block async-trace-timeline">
+                      <div className="async-section-head"><div><b>Trace 时间线</b><span>API → Outbox → Queue → Worker → DB</span></div><Network size={15} /></div>
+                      <div className="async-timeline">{trace.map((event, index) => <div key={`${event.occurred_at}_${index}`}><i className={event.event_status} /><time>{new Date(event.occurred_at).toLocaleTimeString("zh-CN", { hour12: false })}</time><span><b>{event.event_name}</b><small>{event.unit_id ? `${event.unit_id} · ` : ""}{event.message}</small></span></div>)}</div>
+                    </div>
+                    <div className="async-data-block async-errors">
+                      <div className="async-section-head">
+                        <div><b>行级错误</b><span>原始值已脱敏，共 {errorTotal.toLocaleString()} 条</span></div>
+                        <div className="async-error-filters">
+                          <label><Search size={13} /><select value={errorCode} onChange={(event) => { setErrorCode(event.target.value); setErrorPage(1); }}><option value="">全部错误</option><option value="E001">E001 SKU 不存在</option><option value="E002">E002 必填缺失</option><option value="E003">E003 电话格式</option><option value="E004">E004 数量非法</option><option value="E005">E005 外部编码重复</option><option value="W001">W001 降级未校验</option></select></label>
+                          <input placeholder="批次号" inputMode="numeric" value={errorBatch} onChange={(event) => { setErrorBatch(event.target.value); setErrorPage(1); }} />
+                        </div>
+                      </div>
+                      <div className="async-table-wrap"><table><thead><tr><th>批次</th><th>行号</th><th>字段</th><th>原始值</th><th>错误码</th><th>原因</th><th>建议</th></tr></thead><tbody>{errors.map((error) => <tr key={error.id}><td>{error.unit_id}</td><td>{error.row_number}</td><td>{error.field_name}</td><td>{error.raw_value || "-"}</td><td><code>{error.error_code}</code></td><td>{error.error_reason}</td><td>{errorAdvice(error.error_code)}</td></tr>)}</tbody></table>{!errors.length && <div className="async-empty compact">当前筛选下没有错误</div>}</div>
+                      <div className="async-pagination">
+                        <button disabled={errorPage <= 1} onClick={() => setErrorPage((page) => Math.max(1, page - 1))}><ChevronLeft size={13} />上一页</button>
+                        <span>第 {errorPage} / {errorPages} 页</span>
+                        <button disabled={errorPage >= errorPages} onClick={() => setErrorPage((page) => Math.min(errorPages, page + 1))}>下一页<ChevronRight size={13} /></button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>}
+            </section>
+          </div>
         </div>
       )}
     </main>
