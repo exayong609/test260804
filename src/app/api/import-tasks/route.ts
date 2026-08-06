@@ -28,21 +28,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "仅支持 xlsx、xls、docx 和 pdf 文件。" }, { status: 400 });
     }
 
-    let rule: ParsingRule | undefined;
-    if (typeof ruleRaw === "string" && ruleRaw) rule = JSON.parse(ruleRaw) as ParsingRule;
-    if (!rule && ruleId) rule = (await getRuleById(ruleId)) ?? undefined;
-    if (!rule) return NextResponse.json({ error: "请选择有效的解析规则。" }, { status: 400 });
+    let rulePromise: Promise<ParsingRule | undefined> | null = null;
+    if (typeof ruleRaw !== "string" || !ruleRaw) {
+      if (!ruleId) return NextResponse.json({ error: "请选择有效的解析规则。" }, { status: 400 });
+      rulePromise = getRuleById(ruleId).then((found) => found ?? undefined);
+    }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
     const hash = fileHash(bytes);
 
-    const duplicate = await findTaskByFileHash(hash);
+    const duplicatePromise = findTaskByFileHash(hash);
+    let rule: ParsingRule | undefined;
+    if (typeof ruleRaw === "string" && ruleRaw) rule = JSON.parse(ruleRaw) as ParsingRule;
+    else rule = await rulePromise!;
+    const duplicate = await duplicatePromise;
     if (duplicate) {
       return NextResponse.json(
         { ...duplicate, duplicated: true, notice: "相同文件已导入，返回已有任务。" },
         { status: 200 }
       );
     }
+    if (!rule) return NextResponse.json({ error: "请选择有效的解析规则。" }, { status: 400 });
 
     const task = await createImportTaskFast({
       fileName: file.name,
