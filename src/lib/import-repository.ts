@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { ensureImportSchema } from "@/lib/import-schema";
+import { ensureImportSchema, ensureImportSchemaFast } from "@/lib/import-schema";
 import { getSql } from "@/lib/store";
 import type {
   BatchPerformanceInput,
@@ -109,7 +109,7 @@ export async function createImportTask(input: ImportTaskCreateInput) {
 
 export async function findTaskByFileHash(fileHash: string): Promise<ImportTaskSnapshot | null> {
   if (!fileHash) return null;
-  await ensureImportSchema();
+  await ensureImportSchemaFast();
   const sql = requireSql();
   const rows = await sql<Parameters<typeof mapTask>[0][]>`
     select id, trace_id, file_name, status, total_rows, processed_rows, success_rows,
@@ -120,7 +120,7 @@ export async function findTaskByFileHash(fileHash: string): Promise<ImportTaskSn
 }
 
 export async function createImportTaskFast(input: ImportTaskCreateInput): Promise<ImportTaskSnapshot> {
-  await ensureImportSchema();
+  await ensureImportSchemaFast();
   const sql = requireSql();
   const taskId = `task_${randomUUID()}`;
   const traceId = `trace_${randomUUID()}`;

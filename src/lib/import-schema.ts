@@ -154,3 +154,37 @@ export async function ensureImportSchema() {
   });
   await importSchemaReady;
 }
+
+let importSchemaProbe: Promise<void> | null = null;
+
+export async function ensureImportSchemaFast() {
+  importSchemaProbe ||= (async () => {
+    const sql = getSql();
+    if (!sql) throw new Error("异步导入需要配置 DATABASE_URL。");
+    try {
+      const rows = await sql`
+        select
+          to_regclass('sku_master') as r1,
+          to_regclass('import_tasks') as r2,
+          to_regclass('import_files') as r3,
+          to_regclass('import_task_batches') as r4,
+          to_regclass('import_task_rows') as r5,
+          to_regclass('import_task_errors') as r6,
+          to_regclass('event_outbox') as r7,
+          to_regclass('batch_performance_log') as r8,
+          to_regclass('trace_events') as r9,
+          to_regclass('idx_import_tasks_file_hash') as r10,
+          to_regclass('idx_import_errors_idempotent') as r11,
+          to_regclass('idx_trace_events_trace_time') as r12
+      `;
+      if (rows[0] && Object.values(rows[0]).every((value) => value != null)) return;
+    } catch {
+      /* probe failed, run full DDL below */
+    }
+    await ensureImportSchema();
+  })().catch((error) => {
+    importSchemaProbe = null;
+    throw error;
+  });
+  await importSchemaProbe;
+}
