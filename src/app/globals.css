@@ -3839,7 +3839,7 @@ textarea:focus {
 
 .oc-work { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: stretch; }
 .oc-task-list { display: flex; flex-direction: column; }
-.oc-task-rows { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; overflow-y: auto; padding-right: 2px; min-height: 200px; }
+.oc-task-rows { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; overflow-y: auto; padding-right: 2px; min-height: 200px; max-height: 1000px; }
 .oc-task-row {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
   background: var(--oc-panel-2); border: 1px solid var(--oc-line); border-left-width: 3px; border-radius: 8px;
