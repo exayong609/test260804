@@ -1108,7 +1108,7 @@ textarea:focus {
   display: grid;
   grid-template-columns: 310px minmax(0, 1fr);
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .async-task-list,
@@ -1120,8 +1120,9 @@ textarea:focus {
 }
 
 .async-task-list {
-  height: 560px;
-  max-height: 560px;
+  height: auto;
+  min-height: 560px;
+  max-height: none;
   overflow: auto;
   scrollbar-gutter: stable;
 }
@@ -3865,10 +3866,11 @@ textarea:focus {
 .async-error-dist button {
   display: inline-flex; align-items: center; gap: 8px;
   border: 1px solid #e2e8f0; border-radius: 8px; background: #fff;
-  padding: 6px 12px; cursor: pointer; font-size: 12px;
+  padding: 6px 12px; color: #27333c; cursor: pointer; font-size: 12px;
 }
 .async-error-dist button:hover:not(:disabled) { border-color: #0f766e; color: #075b57; background: #effafa; }
 .async-error-dist code { color: #b91c1c; font-weight: 600; }
+.async-error-dist b { color: currentColor; font-weight: 800; }
 .async-error-dist .async-empty { display: grid; width: 100%; min-height: 190px; place-items: center; padding: 0; }
 
 .async-trace-search {
