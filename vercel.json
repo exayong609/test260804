@@ -1,9 +1,5 @@
 {
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
-  "framework": "nextjs",
-  "crons": [
-    { "path": "/api/import-tasks", "schedule": "*/5 * * * *" },
-    { "path": "/api/health", "schedule": "*/5 * * * *" }
-  ]
+  "framework": "nextjs"
 }
