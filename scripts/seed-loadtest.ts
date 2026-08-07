@@ -7,6 +7,7 @@ import { getSql } from "../src/lib/store";
 async function main() {
   const root = process.cwd();
   const targetDir = path.join(root, "test-data");
+  const runId = (process.env.LOAD_TEST_RUN_ID || new Date().toISOString().replace(/\D/g, "").slice(0, 14)).slice(0, 32);
   await fs.mkdir(targetDir, { recursive: true });
 
   const skus = Array.from({ length: 20_000 }, (_, index) => {
@@ -23,7 +24,7 @@ async function main() {
     const no = index + 1;
     const skuNo = ((no * 37) % 20_000) + 1;
     return {
-      外部编码: `LOAD_20260804_${String(no).padStart(5, "0")}`,
+      外部编码: `LOAD_${runId}_${String(no).padStart(5, "0")}`,
       门店名称: `压测门店${(no % 100) + 1}`,
       收货人: `测试收件人${no}`,
       收货电话: `13${String(800_000_000 + (no % 99_999_999)).padStart(9, "0")}`.slice(0, 11),

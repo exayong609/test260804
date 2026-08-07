@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { notifyImportAlert } from "@/lib/import-alerting";
 import { parseUploadToDocument } from "@/lib/document";
 import {
   claimBatch,
@@ -7,9 +8,10 @@ import {
   failTask,
   findExistingExternalCodes,
   findValidSkuCodes,
-  getParsedTaskPayload,
+  getParsedTaskLookup,
   loadBatchRows,
-  persistParsedRows
+  persistParsedRows,
+  recordInsertDuration
 } from "@/lib/import-repository";
 import type { ImportBatchPayload, ImportErrorInput } from "@/lib/import-types";
 import { executeRule } from "@/lib/rule-engine";
@@ -48,9 +50,18 @@ function validationError(taskId: string, unitId: string, batchIndex: number, tra
   };
 }
 
+export class ImportFileNotReadyError extends Error {
+  constructor(taskId: string) {
+    super(`导入任务 ${taskId} 的原始文件尚未持久化，等待重试。`);
+    this.name = "ImportFileNotReadyError";
+  }
+}
+
 export async function processImportTask(taskId: string) {
-  const payload = await getParsedTaskPayload(taskId);
-  if (!payload) throw new Error(`导入任务 ${taskId} 不存在或文件已清理。`);
+  const lookup = await getParsedTaskLookup(taskId);
+  if (lookup.kind === "missing") return { skipped: true, reason: "task-missing" };
+  if (lookup.kind === "file-pending") throw new ImportFileNotReadyError(taskId);
+  const payload = lookup.payload;
   try {
     const parseStarted = performance.now();
     const fileBytes = Uint8Array.from(payload.fileBytes);
@@ -138,8 +149,8 @@ export async function processImportBatch(payload: ImportBatchPayload) {
         taskId: payload.task_id,
         unitId: payload.unit_id,
         batchIndex: claimed.batch_index,
-        parseDurationMs: 0,
-        ruleDurationMs: 0,
+        parseDurationMs: payload.parse_duration_ms ?? 0,
+        ruleDurationMs: payload.rule_duration_ms ?? 0,
         validateDurationMs,
         insertDurationMs: 0,
         totalDurationMs: Math.round(performance.now() - started),
@@ -147,7 +158,21 @@ export async function processImportBatch(payload: ImportBatchPayload) {
         traceId: payload.trace_id
       }
     });
-    return { ...result, degraded, insertDurationMs: Math.round(performance.now() - writeStarted) };
+    const insertDurationMs = Math.round(performance.now() - writeStarted);
+    const totalDurationMs = Math.round(performance.now() - started);
+    if (result.applied) await recordInsertDuration(payload.task_id, payload.unit_id, insertDurationMs, totalDurationMs);
+    if (degraded) {
+      await notifyImportAlert({
+        title: "SKU 校验进入降级",
+        severity: "warning",
+        taskId: payload.task_id,
+        traceId: payload.trace_id,
+        unitId: payload.unit_id,
+        message: `第 ${claimed.batch_index} 批 SKU 主数据查询超时，已记录 W001 并继续处理。`,
+        metadata: { batch_index: claimed.batch_index, source_rows: rows.length, total_duration_ms: totalDurationMs }
+      });
+    }
+    return { ...result, degraded, insertDurationMs, totalDurationMs };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await failBatch(payload.task_id, payload.unit_id, payload.trace_id, message);

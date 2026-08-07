@@ -1,8 +1,17 @@
 import { Worker } from "bullmq";
+import { notifyImportAlert } from "../src/lib/import-alerting";
 import { dispatchOutboxEvents, getRedisConnection, IMPORT_QUEUE_NAME } from "../src/lib/import-queue";
 import { processImportBatch, processImportTask } from "../src/lib/import-processor";
-import { recoverStuckBatches } from "../src/lib/import-repository";
+import { recordTraceEvent, recoverStuckBatches } from "../src/lib/import-repository";
 import type { ImportBatchPayload } from "../src/lib/import-types";
+
+async function safeRecordTrace(input: Parameters<typeof recordTraceEvent>[0]) {
+  try {
+    await recordTraceEvent(input);
+  } catch (error) {
+    console.error(`[trace] ${input.eventName} failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 
 async function main() {
 const concurrency = Math.max(1, Math.min(Number(process.env.IMPORT_WORKER_CONCURRENCY || 4), 12));
@@ -11,19 +20,69 @@ const connection = getRedisConnection().duplicate();
 const worker = new Worker(
   IMPORT_QUEUE_NAME,
   async (job) => {
-    if (job.name === "ImportTaskCreated") {
-      return processImportTask(String(job.data.task_id));
+    const taskId = String(job.data.task_id || "");
+    const traceId = String(job.data.trace_id || "");
+    const unitId = job.data.unit_id ? String(job.data.unit_id) : undefined;
+    if (traceId && taskId) {
+      await safeRecordTrace({
+        traceId,
+        taskId,
+        unitId,
+        eventName: "WorkerJobStarted",
+        eventStatus: "processing",
+        message: `${job.name} 开始处理`,
+        metadata: { job_id: String(job.id ?? ""), attempt: job.attemptsMade + 1 }
+      });
     }
-    if (job.name === "ImportBatchCreated") {
-      return processImportBatch(job.data as ImportBatchPayload);
+    try {
+      let result: unknown;
+      if (job.name === "ImportTaskCreated") result = await processImportTask(taskId);
+      else if (job.name === "ImportBatchCreated") result = await processImportBatch(job.data as ImportBatchPayload);
+      else throw new Error(`不支持的导入事件：${job.name}`);
+      if (traceId && taskId) {
+        await safeRecordTrace({
+          traceId,
+          taskId,
+          unitId,
+          eventName: "WorkerJobCompleted",
+          eventStatus: "success",
+          message: `${job.name} 处理完成`,
+          metadata: { job_id: String(job.id ?? ""), attempt: job.attemptsMade + 1 }
+        });
+      }
+      return result;
+    } catch (error) {
+      if (traceId && taskId) {
+        await safeRecordTrace({
+          traceId,
+          taskId,
+          unitId,
+          eventName: "WorkerJobFailed",
+          eventStatus: "failed",
+          message: error instanceof Error ? error.message : String(error),
+          metadata: { job_id: String(job.id ?? ""), attempt: job.attemptsMade + 1 }
+        });
+      }
+      throw error;
     }
-    throw new Error(`不支持的导入事件：${job.name}`);
   },
   { connection, concurrency }
 );
 
 worker.on("completed", (job) => console.log(`[worker] completed ${job.name} ${job.id}`));
-worker.on("failed", (job, error) => console.error(`[worker] failed ${job?.name} ${job?.id}: ${error.message}`));
+worker.on("failed", (job, error) => {
+  console.error(`[worker] failed ${job?.name} ${job?.id}: ${error.message}`);
+  if (!job || job.attemptsMade < Number(job.opts.attempts ?? 1)) return;
+  void notifyImportAlert({
+    title: "导入任务最终失败",
+    severity: "error",
+    taskId: String(job.data.task_id || "unknown"),
+    traceId: String(job.data.trace_id || "unknown"),
+    unitId: job.data.unit_id ? String(job.data.unit_id) : undefined,
+    message: error.message,
+    metadata: { job_name: job.name, attempts: job.attemptsMade }
+  });
+});
 worker.on("error", (error) => console.error(`[worker] error: ${error.message}`));
 
 let dispatching = false;

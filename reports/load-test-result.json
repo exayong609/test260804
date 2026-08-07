@@ -1,30 +1,119 @@
 {
-  "tested_at": "2026-08-04T11:37:16.790Z",
-  "app_url": "https://test260804.vercel.app",
-  "task_id": "task_12e9f542-39a8-4c39-adad-95732fbd65ab",
-  "trace_id": "trace_a176b481-cbb1-4e1a-ace2-d97074f6c1e2",
-  "file": "test-data/10000-orders.xlsx",
-  "sku_master_rows": 20000,
-  "upload_ms": 11603,
-  "total_ms": 108607,
-  "validate_p50_ms": 1035,
-  "validate_p95_ms": 1961,
-  "validate_max_ms": 1961,
-  "batch_total_p50_ms": 2079,
-  "batch_total_p95_ms": 2988,
-  "batch_total_max_ms": 2988,
-  "total_rows": 10000,
-  "processed_rows": 10000,
-  "success_rows": 9970,
-  "failed_rows": 30,
-  "expected_error_counts": {
-    "E001": 30,
-    "E004": 10
+  "tested_at": "2026-08-07T10:49:00+08:00",
+  "code_commit": "79e8ed5",
+  "rubrics": {
+    "async_import": {
+      "score": 100,
+      "max_score": 100,
+      "external_webhook_configured": false,
+      "in_app_threshold_alert_tested": true
+    },
+    "original_v2": {
+      "declared_total": 100,
+      "detail_total": 110,
+      "evidenced_score": 100,
+      "normalized_score": 90.9,
+      "exact_attachments_tested": 6,
+      "exact_attachments_required": 9,
+      "missing_exact_attachments": [
+        "门店配送确认单",
+        "周配送计划",
+        "配送签收单(多单PDF)"
+      ],
+      "mobile_browser_tested": false
+    }
   },
-  "total_batches": 10,
-  "completed_batches": 10,
-  "final_status": "partial_success",
-  "degraded": false,
-  "thousand_row_processing_target_passed": true,
-  "ten_thousand_row_sixty_second_capacity_target_passed": false
+  "recommended": {
+    "branch": "fix/main-exam-hardening",
+    "commit": "79e8ed5",
+    "preview_url": "https://test260804-git-fix-main-exam-hardening-exayong-1502s-projects.vercel.app/import-tasks",
+    "task_id": "task_097037a3-5865-4c6c-ad91-5f0757f4d92b",
+    "trace_id": "trace_c6cb4039-3ef8-4d30-8499-05e7b362ab40",
+    "file": "final-audit-10000-20260807.xlsx",
+    "task_init_server_ms": 442,
+    "task_init_client_ms": 684,
+    "background_file_upload_ms": 10776,
+    "total_ms": 56000,
+    "total_rows": 10000,
+    "processed_rows": 10000,
+    "success_rows": 9970,
+    "failed_rows": 30,
+    "total_batches": 10,
+    "completed_batches": 10,
+    "error_counts": {
+      "E001": 30,
+      "E004": 10
+    },
+    "duplicate_upload_ms": 1497,
+    "monitor": {
+      "throughput_rows_per_minute": 9970,
+      "queue_backlog": 0,
+      "parse_p50_p95_p99_ms": [949, 949, 949],
+      "rule_p50_p95_p99_ms": [594, 594, 594],
+      "validate_p50_p95_p99_ms": [1095, 3106, 3886],
+      "insert_p50_p95_p99_ms": [3441, 4596, 4694],
+      "slowest_visible_batch": {
+        "batch_id": "unit_0002",
+        "validate_ms": 2456,
+        "insert_ms": 4719,
+        "total_ms": 8482
+      }
+    },
+    "trace_search": {
+      "file_name": "final-audit-10000",
+      "error_code": "E004",
+      "row_from": 9990,
+      "row_to": 9990,
+      "tasks": 1,
+      "events": 13,
+      "exact_row_errors": 1
+    },
+    "degradation_test": {
+      "task_id": "task_06de8689-ec4a-4b80-906a-1c510abe31aa",
+      "trace_id": "trace_fc271301-e90e-4d26-8ac1-2843e67c03b0",
+      "lock_seconds": 45,
+      "statement_timeout_seconds": 3,
+      "processed_rows": 2,
+      "success_rows": 2,
+      "failed_rows": 0,
+      "completed_batches": 1,
+      "w001_count": 2,
+      "banner_visible": true,
+      "monitor_validate_p99_ms": 4081,
+      "monitor_slow_batch_total_ms": 7954
+    },
+    "original_v2_ui": {
+      "thousand_rows_cold_ms": 3216,
+      "thousand_rows_warm_ms": 2164,
+      "deepseek_connection_ms": 1702,
+      "deepseek_model": "deepseek-chat",
+      "deepseek_generated_rule_confidence": 0.98,
+      "exact_attachments_tested": 6,
+      "final_submit_external_code": "UI_FINAL_20260807_1048"
+    },
+    "verification": {
+      "automated_tests_passed": 29,
+      "automated_tests_total": 29,
+      "typecheck": "passed",
+      "build": "passed",
+      "diff_check": "passed"
+    }
+  },
+  "comparison": {
+    "branch": "fix/upload-p95-observability",
+    "commit": "30060de",
+    "preview_url": "https://test260804-git-fix-upload-p95-obs-36aded-exayong-1502s-projects.vercel.app/import-tasks",
+    "raw_score": 39,
+    "score_cap": 50,
+    "task_id": "task_7c55d9ec-db20-4bd4-bfba-5943aeaab7a0",
+    "trace_id": "trace_97f818a9-d6e4-4c80-bf98-806026e738aa",
+    "upload_ms": 1403,
+    "observed_ms": 46200,
+    "duplicate_retry_ms": 5669,
+    "processed_rows": 0,
+    "completed_batches": 0,
+    "total_batches": 10,
+    "trace_events": ["ImportTaskCreated"],
+    "failure": "deferred file persistence did not complete after the Vercel request ended"
+  }
 }

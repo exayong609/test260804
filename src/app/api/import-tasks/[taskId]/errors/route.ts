@@ -9,6 +9,8 @@ export async function GET(request: Request, context: { params: Promise<{ taskId:
     const result = await listImportErrors(taskId, {
       batch: Number(params.get("batch") || 0) || undefined,
       code: params.get("error_code") || undefined,
+      rowFrom: Number(params.get("row_from") || 0) || undefined,
+      rowTo: Number(params.get("row_to") || 0) || undefined,
       page: Number(params.get("page") || 1),
       pageSize: Number(params.get("page_size") || 50)
     });
