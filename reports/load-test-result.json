@@ -1,33 +1,39 @@
 {
-  "tested_at": "2026-08-07T09:51:00+08:00",
-  "rubric": {
-    "name": "async-import-100-point",
-    "weights": {
-      "event_driven": 20,
-      "batch_performance": 25,
-      "idempotency_recovery": 15,
-      "error_detail": 10,
-      "observability": 20,
-      "degradation_capacity": 5,
-      "submission_quality": 5
+  "tested_at": "2026-08-07T10:49:00+08:00",
+  "code_commit": "79e8ed5",
+  "rubrics": {
+    "async_import": {
+      "score": 100,
+      "max_score": 100,
+      "external_webhook_configured": false,
+      "in_app_threshold_alert_tested": true
     },
-    "upload_cap": "task initialization over 1000ms caps the total score at 50"
+    "original_v2": {
+      "declared_total": 100,
+      "detail_total": 110,
+      "evidenced_score": 100,
+      "normalized_score": 90.9,
+      "exact_attachments_tested": 6,
+      "exact_attachments_required": 9,
+      "missing_exact_attachments": [
+        "门店配送确认单",
+        "周配送计划",
+        "配送签收单(多单PDF)"
+      ],
+      "mobile_browser_tested": false
+    }
   },
   "recommended": {
     "branch": "fix/main-exam-hardening",
-    "performance_commit": "7e55d8a",
-    "ui_commit": "838f7fe",
+    "commit": "79e8ed5",
     "preview_url": "https://test260804-git-fix-main-exam-hardening-exayong-1502s-projects.vercel.app/import-tasks",
-    "score": 100,
-    "task_id": "task_84598796-ef7e-4585-82e4-247d2400e84e",
-    "trace_id": "trace_928c0355-123f-4a94-89da-72af16aa13da",
-    "file": "online-load-917fb7b.xlsx",
-    "sku_master_rows": 20000,
-    "task_init_server_ms": 435,
-    "task_init_client_ms": 670,
-    "task_visible_ms": 973,
-    "background_file_upload_ms": 5549,
-    "total_ms": 48000,
+    "task_id": "task_097037a3-5865-4c6c-ad91-5f0757f4d92b",
+    "trace_id": "trace_c6cb4039-3ef8-4d30-8499-05e7b362ab40",
+    "file": "final-audit-10000-20260807.xlsx",
+    "task_init_server_ms": 442,
+    "task_init_client_ms": 684,
+    "background_file_upload_ms": 10776,
+    "total_ms": 56000,
     "total_rows": 10000,
     "processed_rows": 10000,
     "success_rows": 9970,
@@ -38,32 +44,35 @@
       "E001": 30,
       "E004": 10
     },
+    "duplicate_upload_ms": 1497,
     "monitor": {
-      "throughput_rows_per_minute": 5982,
+      "throughput_rows_per_minute": 9970,
       "queue_backlog": 0,
-      "parse_p50_p95_p99_ms": [917, 917, 917],
-      "rule_p50_p95_p99_ms": [554, 554, 554],
-      "validate_p50_p95_p99_ms": [1274, 1296, 1300],
-      "insert_p50_p95_p99_ms": [3335, 4447, 4674]
+      "parse_p50_p95_p99_ms": [949, 949, 949],
+      "rule_p50_p95_p99_ms": [594, 594, 594],
+      "validate_p50_p95_p99_ms": [1095, 3106, 3886],
+      "insert_p50_p95_p99_ms": [3441, 4596, 4694],
+      "slowest_visible_batch": {
+        "batch_id": "unit_0002",
+        "validate_ms": 2456,
+        "insert_ms": 4719,
+        "total_ms": 8482
+      }
     },
-    "batches": [
-      { "batch": 1, "validate_ms": 1289, "insert_ms": 4099, "total_ms": 6674 },
-      { "batch": 2, "validate_ms": 1301, "insert_ms": 4731, "total_ms": 7316 },
-      { "batch": 3, "validate_ms": 1284, "insert_ms": 4094, "total_ms": 6705 },
-      { "batch": 4, "validate_ms": 1073, "insert_ms": 3910, "total_ms": 6053 },
-      { "batch": 5, "validate_ms": 1076, "insert_ms": 2819, "total_ms": 4967 },
-      { "batch": 6, "validate_ms": 1274, "insert_ms": 3052, "total_ms": 5396 },
-      { "batch": 7, "validate_ms": 1075, "insert_ms": 3209, "total_ms": 5555 },
-      { "batch": 8, "validate_ms": 1286, "insert_ms": 2772, "total_ms": 5123 },
-      { "batch": 9, "validate_ms": 1275, "insert_ms": 3461, "total_ms": 5810 },
-      { "batch": 10, "validate_ms": 1082, "insert_ms": 2790, "total_ms": 4952 }
-    ],
+    "trace_search": {
+      "file_name": "final-audit-10000",
+      "error_code": "E004",
+      "row_from": 9990,
+      "row_to": 9990,
+      "tasks": 1,
+      "events": 13,
+      "exact_row_errors": 1
+    },
     "degradation_test": {
       "task_id": "task_06de8689-ec4a-4b80-906a-1c510abe31aa",
       "trace_id": "trace_fc271301-e90e-4d26-8ac1-2843e67c03b0",
       "lock_seconds": 45,
       "statement_timeout_seconds": 3,
-      "total_ms": 13000,
       "processed_rows": 2,
       "success_rows": 2,
       "failed_rows": 0,
@@ -72,6 +81,22 @@
       "banner_visible": true,
       "monitor_validate_p99_ms": 4081,
       "monitor_slow_batch_total_ms": 7954
+    },
+    "original_v2_ui": {
+      "thousand_rows_cold_ms": 3216,
+      "thousand_rows_warm_ms": 2164,
+      "deepseek_connection_ms": 1702,
+      "deepseek_model": "deepseek-chat",
+      "deepseek_generated_rule_confidence": 0.98,
+      "exact_attachments_tested": 6,
+      "final_submit_external_code": "UI_FINAL_20260807_1048"
+    },
+    "verification": {
+      "automated_tests_passed": 29,
+      "automated_tests_total": 29,
+      "typecheck": "passed",
+      "build": "passed",
+      "diff_check": "passed"
     }
   },
   "comparison": {
