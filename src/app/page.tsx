@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { ORDER_FIELD_LABELS, ORDER_FIELDS } from "@/lib/fields";
 import { makeId } from "@/lib/ids";
-import { validateRows } from "@/lib/validation";
+import { groupRows, validateRows } from "@/lib/validation";
 import type {
   IntermediateDocument,
   LlmProfile,
@@ -334,7 +334,7 @@ export default function Home() {
   const issues = rows.length ? [...clientIssues, ...persistentServerIssues] : serverIssues;
   const errorCount = issues.filter((issue) => issue.severity === "error").length;
   const warningCount = issues.filter((issue) => issue.severity === "warning").length;
-  const groupsCount = useMemo(() => new Set(rows.map((row) => row.externalCode || row.id)).size, [rows]);
+  const groupsCount = useMemo(() => groupRows(rows).length, [rows]);
   const historyTotalPages = Math.max(1, Math.ceil(history.total / historyFilters.pageSize));
   const historyStart = history.total ? (historyFilters.page - 1) * historyFilters.pageSize + 1 : 0;
   const historyEnd = Math.min(history.total, historyFilters.page * historyFilters.pageSize);

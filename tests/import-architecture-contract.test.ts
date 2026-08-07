@@ -92,6 +92,20 @@ test("Trace search exposes task, file, batch, row and error filters", async () =
   }
 });
 
+test("Trace row filters propagate to the linked task error list", async () => {
+  const page = await source("src/app/import-tasks/page.tsx");
+  const route = await source("src/app/api/import-tasks/[taskId]/errors/route.ts");
+  const repository = await source("src/lib/import-repository.ts");
+  assert.match(page, /query\.set\("row_from", rowFrom\)/);
+  assert.match(page, /query\.set\("row_to", rowTo\)/);
+  assert.match(page, /setErrorRowFrom\(traceQuery\.row_from\.trim\(\)\)/);
+  assert.match(page, /setErrorRowTo\(traceQuery\.row_to\.trim\(\)\)/);
+  assert.match(route, /rowFrom: Number\(params\.get\("row_from"\)/);
+  assert.match(route, /rowTo: Number\(params\.get\("row_to"\)/);
+  assert.match(repository, /row_number >= \$\{options\.rowFrom/);
+  assert.match(repository, /row_number <= \$\{options\.rowTo/);
+});
+
 test("internal Outbox dispatch requires a bearer secret", async () => {
   const route = await source("src/app/api/internal/outbox/dispatch/route.ts");
   assert.match(route, /INTERNAL_API_KEY/);

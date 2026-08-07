@@ -121,6 +121,8 @@ export default function ImportTasksPage() {
   const [errorPage, setErrorPage] = useState(1);
   const [errorCode, setErrorCode] = useState("");
   const [errorBatch, setErrorBatch] = useState("");
+  const [errorRowFrom, setErrorRowFrom] = useState("");
+  const [errorRowTo, setErrorRowTo] = useState("");
   const [batches, setBatches] = useState<Batch[]>([]);
   const [trace, setTrace] = useState<TraceEvent[]>([]);
   const [monitor, setMonitor] = useState<Monitor | null>(null);
@@ -147,9 +149,11 @@ export default function ImportTasksPage() {
     }
   }, []);
 
-  const loadDetail = useCallback(async (task: Task, page: number, code: string, batch: string) => {
+  const loadDetail = useCallback(async (task: Task, page: number, code: string, batch: string, rowFrom: string, rowTo: string) => {
     const query = new URLSearchParams({ error_code: code, page: String(page), page_size: String(ERROR_PAGE_SIZE) });
     if (batch) query.set("batch", batch);
+    if (rowFrom) query.set("row_from", rowFrom);
+    if (rowTo) query.set("row_to", rowTo);
     const [errorResult, batchResult, traceResult] = await Promise.allSettled([
       readJson<{ items: ImportError[]; total: number }>(await fetch(`/api/import-tasks/${task.task_id}/errors?${query}`, { cache: "no-store" })),
       readJson<{ items: Batch[] }>(await fetch(`/api/import-tasks/${task.task_id}/batches`, { cache: "no-store" })),
@@ -192,8 +196,8 @@ export default function ImportTasksPage() {
   }, [selected?.task_id]);
 
   useEffect(() => {
-    if (selected) void loadDetail(selected, errorPage, errorCode, errorBatch);
-  }, [loadDetail, selected, errorPage, errorCode, errorBatch]);
+    if (selected) void loadDetail(selected, errorPage, errorCode, errorBatch, errorRowFrom, errorRowTo);
+  }, [loadDetail, selected, errorPage, errorCode, errorBatch, errorRowFrom, errorRowTo]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -276,6 +280,8 @@ export default function ImportTasksPage() {
         setSelectedId(result.tasks[0].task_id);
         setErrorCode(traceQuery.error_code.trim());
         setErrorBatch(traceQuery.batch.trim());
+        setErrorRowFrom(traceQuery.row_from.trim());
+        setErrorRowTo(traceQuery.row_to.trim());
         setErrorPage(1);
         setDetailTab("fault");
       }
@@ -369,7 +375,7 @@ export default function ImportTasksPage() {
           <div className="async-section-head"><div><b>错误类型分布（近 1 小时）</b><span>点击错误码联动到任务错误明细</span></div><AlertTriangle size={15} /></div>
           <div className="async-error-dist">
             {(monitor?.errors ?? []).map((item) => (
-              <button key={item.error_code} title={`筛选 ${item.error_code} 错误明细`} onClick={() => { setErrorCode(item.error_code); setErrorPage(1); setDetailTab("fault"); setActiveTab("work"); }}>
+              <button key={item.error_code} title={`筛选 ${item.error_code} 错误明细`} onClick={() => { setErrorCode(item.error_code); setErrorRowFrom(""); setErrorRowTo(""); setErrorPage(1); setDetailTab("fault"); setActiveTab("work"); }}>
                 <code>{item.error_code}</code><b>{item.count.toLocaleString()}</b>
               </button>
             ))}
@@ -427,6 +433,8 @@ export default function ImportTasksPage() {
                       setSelectedId(task.task_id);
                       setErrorCode(traceQuery.error_code.trim());
                       setErrorBatch(traceQuery.batch.trim());
+                      setErrorRowFrom(traceQuery.row_from.trim());
+                      setErrorRowTo(traceQuery.row_to.trim());
                       setErrorPage(1);
                       setDetailTab("fault");
                     }}>
@@ -455,7 +463,7 @@ export default function ImportTasksPage() {
             <section className="async-task-list">
               <div className="async-section-head"><div><b>导入任务</b><span>最近 {tasks.length} 个任务 · 固定高度滚动</span></div><button title="刷新" aria-label="刷新任务列表" onClick={() => void loadTasks()}><RefreshCw size={14} /></button></div>
               {tasks.length === 0 ? <div className="async-empty async-task-empty">暂无异步任务</div> : tasks.map((task) => (
-                <button key={task.task_id} className={`async-task-row ${selected?.task_id === task.task_id ? "active" : ""}`} onClick={() => { setSelectedId(task.task_id); setErrorPage(1); }}>
+                <button key={task.task_id} className={`async-task-row ${selected?.task_id === task.task_id ? "active" : ""}`} onClick={() => { setSelectedId(task.task_id); setErrorRowFrom(""); setErrorRowTo(""); setErrorPage(1); }}>
                   <FileSpreadsheet size={17} />
                   <span><b>{task.file_name}</b><small>{task.task_id.slice(0, 18)}…</small></span>
                   <em className={`async-status ${task.status}`}>{statusText[task.status]}</em>

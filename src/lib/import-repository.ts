@@ -686,7 +686,7 @@ export async function failTask(taskId: string, traceId: string, error: string) {
   });
 }
 
-export async function listImportErrors(taskId: string, options: { batch?: number; code?: string; page: number; pageSize: number }) {
+export async function listImportErrors(taskId: string, options: { batch?: number; code?: string; rowFrom?: number; rowTo?: number; page: number; pageSize: number }) {
   await ensureImportSchema();
   const sql = requireSql();
   const page = Math.max(1, options.page);
@@ -699,6 +699,8 @@ export async function listImportErrors(taskId: string, options: { batch?: number
     where task_id = ${taskId}
       and (${options.batch ?? 0} = 0 or batch_index = ${options.batch ?? 0})
       and (${options.code ?? ""} = '' or error_code = ${options.code ?? ""})
+      and (${options.rowFrom ?? 0} = 0 or row_number >= ${options.rowFrom ?? 0})
+      and (${options.rowTo ?? 0} = 0 or row_number <= ${options.rowTo ?? 0})
     order by row_number, id
     limit ${pageSize} offset ${(page - 1) * pageSize}
   `;
