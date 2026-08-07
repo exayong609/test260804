@@ -3,7 +3,6 @@ import { createOrReuseImportTaskFast, listImportTasks, persistImportFileAndActiv
 import { estimateRowCount, fileHash } from "@/lib/import-upload";
 import { getRuleById } from "@/lib/store";
 import type { ParsingRule } from "@/types";
-import { processImportTaskInBackground } from "@/lib/serverless-import-fallback";
 import { parseImportTaskInit, shouldUseServerlessFallback } from "@/lib/import-task-init";
 
 export const runtime = "nodejs";
@@ -108,7 +107,10 @@ export async function POST(request: Request) {
           hash,
           { delivery: runServerlessFallback ? "serverless" : "queue" }
         );
-        if (runServerlessFallback) await processImportTaskInBackground(task.task_id);
+        if (runServerlessFallback) {
+          const { processImportTaskInBackground } = await import("@/lib/serverless-import-fallback");
+          await processImportTaskInBackground(task.task_id);
+        }
       } catch (error) {
         console.error("[import-file-persist] failed", error);
       }

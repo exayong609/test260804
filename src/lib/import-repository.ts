@@ -799,6 +799,35 @@ export async function recoverStuckBatches() {
   `;
 }
 
+export async function failAbandonedFileUploads() {
+  await ensureImportSchema();
+  const sql = requireSql();
+  return sql`
+    with abandoned as (
+      update import_tasks t
+      set status = 'failed', completed_at = now()
+      where t.status = 'pending'
+        and t.created_at < now() - interval '15 minutes'
+        and not exists (select 1 from import_files f where f.task_id = t.id)
+      returning t.id, t.trace_id, t.file_name
+    ), cancelled_outbox as (
+      update event_outbox o
+      set status = 'sent', sent_at = now(), last_error = 'abandoned: file never uploaded'
+      from abandoned a
+      where o.aggregate_id = a.id and o.status in ('pending', 'failed')
+      returning o.id
+    ), traced as (
+      insert into trace_events (trace_id, task_id, event_name, event_status, message, metadata)
+      select a.trace_id, a.id, 'ImportFileUploadAbandoned', 'failed',
+        '文件上传超过 15 分钟未完成，任务已自动标记失败，请重新上传',
+        jsonb_build_object('reason', 'file_upload_timeout', 'file_name', a.file_name)
+      from abandoned a
+      returning id
+    )
+    select count(*)::int as recovered from abandoned
+  `;
+}
+
 export type TraceSearchOptions = {
   taskId?: string;
   traceId?: string;

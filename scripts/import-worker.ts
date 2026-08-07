@@ -1,7 +1,7 @@
 import { Worker } from "bullmq";
 import { dispatchOutboxEvents, getRedisConnection, IMPORT_QUEUE_NAME } from "../src/lib/import-queue";
 import { processImportBatch, processImportTask } from "../src/lib/import-processor";
-import { recordTraceEvent, recoverStuckBatches } from "../src/lib/import-repository";
+import { failAbandonedFileUploads, recordTraceEvent, recoverStuckBatches } from "../src/lib/import-repository";
 import type { ImportBatchPayload } from "../src/lib/import-types";
 
 async function safeRecordTrace(input: Parameters<typeof recordTraceEvent>[0]) {
@@ -86,7 +86,16 @@ async function dispatch() {
 
 await dispatch();
 const dispatcher = setInterval(() => void dispatch(), 1_000);
-const recovery = setInterval(() => void recoverStuckBatches(), 60_000);
+async function recover() {
+  try {
+    await recoverStuckBatches();
+    const [result] = await failAbandonedFileUploads();
+    if (result?.recovered > 0) console.log(`[recovery] abandoned uploads marked failed: ${result.recovered}`);
+  } catch (error) {
+    console.error(`[recovery] failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+const recovery = setInterval(() => void recover(), 60_000);
 
 async function shutdown(signal: string) {
   console.log(`[worker] ${signal}, shutting down`);

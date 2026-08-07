@@ -1,4 +1,5 @@
 import {
+  failAbandonedFileUploads,
   getImportTask,
   listImportBatches,
   markOutboxForTaskSent,
@@ -9,6 +10,7 @@ import { processImportBatch, processImportTask } from "@/lib/import-processor";
 
 export async function processImportTaskInBackground(taskId: string) {
   await recoverStuckBatches();
+  await failAbandonedFileUploads();
   await markOutboxForTaskSent(taskId, "ImportTaskCreated");
   let parsed: Awaited<ReturnType<typeof processImportTask>>;
   try {

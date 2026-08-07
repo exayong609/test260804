@@ -91,3 +91,29 @@ test("internal Outbox dispatch requires a bearer secret", async () => {
   assert.match(route, /Bearer/);
   assert.match(route, /status: 401/);
 });
+
+test("abandoned file uploads are auto-failed, cancelled and traced", async () => {
+  const repository = await source("src/lib/import-repository.ts");
+  const worker = await source("scripts/import-worker.ts");
+  const fallback = await source("src/lib/serverless-import-fallback.ts");
+  const fn = repository.slice(
+    repository.indexOf("export async function failAbandonedFileUploads"),
+    repository.indexOf("export type TraceSearchOptions")
+  );
+  assert.match(fn, /not exists \(select 1 from import_files/);
+  assert.match(fn, /set status = 'failed', completed_at = now\(\)/);
+  assert.match(fn, /cancelled_outbox as/);
+  assert.match(fn, /ImportFileUploadAbandoned/);
+  assert.match(worker, /failAbandonedFileUploads/);
+  assert.match(fallback, /failAbandonedFileUploads/);
+});
+
+test("upload routes keep the heavy parser chain out of their cold start", async () => {
+  const route = await source("src/app/api/import-tasks/route.ts");
+  const fileRoute = await source("src/app/api/import-tasks/[taskId]/file/route.ts");
+  for (const text of [route, fileRoute]) {
+    assert.doesNotMatch(text, /^import \{[^}]*\} from "@\/lib\/serverless-import-fallback";$/m);
+    assert.doesNotMatch(text, /^import .* from "@\/lib\/import-processor";$/m);
+    assert.match(text, /await import\("@\/lib\/serverless-import-fallback"\)/);
+  }
+});

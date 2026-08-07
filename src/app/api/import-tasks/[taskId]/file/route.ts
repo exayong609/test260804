@@ -1,7 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { fileHash } from "@/lib/import-upload";
 import { persistImportFileAndActivate } from "@/lib/import-repository";
-import { processImportTaskInBackground } from "@/lib/serverless-import-fallback";
 import { MAX_IMPORT_FILE_BYTES, shouldUseServerlessFallback } from "@/lib/import-task-init";
 
 export const runtime = "nodejs";
@@ -45,6 +44,7 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     if (runServerlessFallback) {
       after(async () => {
         try {
+          const { processImportTaskInBackground } = await import("@/lib/serverless-import-fallback");
           await processImportTaskInBackground(taskId);
         } catch (error) {
           console.error("[serverless-import-fallback] failed", error);
