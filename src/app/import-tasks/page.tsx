@@ -177,12 +177,19 @@ export default function ImportTasksPage() {
     void Promise.all([
       fetch("/api/rules").then((response) => readJson<{ rules: ParsingRule[] }>(response)).then((data) => {
         setRules(data.rules);
-        setRuleId(data.rules[0]?.id || "");
+        setRuleId((current) => data.rules.some((rule) => rule.id === current) ? current : "");
       }),
       loadTasks(),
       loadMonitor()
     ]);
   }, [loadMonitor, loadTasks]);
+
+  useEffect(() => {
+    setErrors([]);
+    setErrorTotal(0);
+    setBatches([]);
+    setTrace([]);
+  }, [selected?.task_id]);
 
   useEffect(() => {
     if (selected) void loadDetail(selected, errorPage, errorCode, errorBatch);

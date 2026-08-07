@@ -47,6 +47,13 @@ test("an interrupted browser upload can resume the existing task", async () => {
   assert.match(page, /uploadTaskFile\(task\.task_id/);
 });
 
+test("task workspace requires an explicit rule and clears stale detail state", async () => {
+  const page = await source("src/app/import-tasks/page.tsx");
+  assert.doesNotMatch(page, /setRuleId\(data\.rules\[0\]/);
+  assert.match(page, /data\.rules\.some\(\(rule\) => rule\.id === current\)/);
+  assert.match(page, /setErrors\(\[\]\);\s+setErrorTotal\(0\);\s+setBatches\(\[\]\);\s+setTrace\(\[\]\);/);
+});
+
 test("queue jobs use bounded retries and exponential backoff", async () => {
   const queue = await source("src/lib/import-queue.ts");
   const processor = await source("src/lib/import-processor.ts");
