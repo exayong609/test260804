@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { notifyImportAlert } from "@/lib/import-alerting";
 import { parseUploadToDocument } from "@/lib/document";
 import {
   claimBatch,
@@ -160,6 +161,17 @@ export async function processImportBatch(payload: ImportBatchPayload) {
     const insertDurationMs = Math.round(performance.now() - writeStarted);
     const totalDurationMs = Math.round(performance.now() - started);
     if (result.applied) await recordInsertDuration(payload.task_id, payload.unit_id, insertDurationMs, totalDurationMs);
+    if (degraded) {
+      await notifyImportAlert({
+        title: "SKU 校验进入降级",
+        severity: "warning",
+        taskId: payload.task_id,
+        traceId: payload.trace_id,
+        unitId: payload.unit_id,
+        message: `第 ${claimed.batch_index} 批 SKU 主数据查询超时，已记录 W001 并继续处理。`,
+        metadata: { batch_index: claimed.batch_index, source_rows: rows.length, total_duration_ms: totalDurationMs }
+      });
+    }
     return { ...result, degraded, insertDurationMs, totalDurationMs };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -11,4 +11,4 @@
 - `../docs/async-import-architecture.md`：异步事件驱动架构和运行边界。
 - `../docs/考试验收报告.md`：按考试考点整理的最终验收证据与现场展示检查清单。
 
-线上地址、仓库、反思题、交付清单和压测证据均已写入提交汇总表。压测环境未把数据库或 Redis 密钥写入仓库；运行时密钥仅配置在 Vercel / Railway 环境变量中。
+线上地址、仓库、反思题、交付清单和 2026-08-07 两版本 fresh run 压测证据均已写入提交汇总表。最终推荐 `fix/main-exam-hardening`，实测评分 100/100；`fix/upload-p95-observability` 因上传超过 1 秒且文件未持久化不作为提交版本。压测环境未把数据库、Redis、LLM 或 Webhook 密钥写入仓库；运行时密钥仅配置在 Vercel / Railway 环境变量中。

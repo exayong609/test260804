@@ -1,4 +1,5 @@
 import { Worker } from "bullmq";
+import { notifyImportAlert } from "../src/lib/import-alerting";
 import { dispatchOutboxEvents, getRedisConnection, IMPORT_QUEUE_NAME } from "../src/lib/import-queue";
 import { processImportBatch, processImportTask } from "../src/lib/import-processor";
 import { recordTraceEvent, recoverStuckBatches } from "../src/lib/import-repository";
@@ -69,7 +70,19 @@ const worker = new Worker(
 );
 
 worker.on("completed", (job) => console.log(`[worker] completed ${job.name} ${job.id}`));
-worker.on("failed", (job, error) => console.error(`[worker] failed ${job?.name} ${job?.id}: ${error.message}`));
+worker.on("failed", (job, error) => {
+  console.error(`[worker] failed ${job?.name} ${job?.id}: ${error.message}`);
+  if (!job || job.attemptsMade < Number(job.opts.attempts ?? 1)) return;
+  void notifyImportAlert({
+    title: "导入任务最终失败",
+    severity: "error",
+    taskId: String(job.data.task_id || "unknown"),
+    traceId: String(job.data.trace_id || "unknown"),
+    unitId: job.data.unit_id ? String(job.data.unit_id) : undefined,
+    message: error.message,
+    metadata: { job_name: job.name, attempts: job.attemptsMade }
+  });
+});
 worker.on("error", (error) => console.error(`[worker] error: ${error.message}`));
 
 let dispatching = false;

@@ -21,6 +21,7 @@
 - `GET /api/import-monitor/summary`：实时吞吐、近 5 分钟吞吐序列、队列状态、四阶段 P50/P95/P99、错误分布、慢批次 TOP 10。
 - `GET /api/traces?task_id=&trace_id=&file_name=&batch=&row_from=&row_to=&error_code=`：多维检索任务、时间线事件和行级错误。
 - `GET /api/traces/:traceId`：单链路时间线。
+- 可选 `IMPORT_ALERT_WEBHOOK_URL`：SKU 查询降级或 BullMQ 最终失败时发送钉钉 Markdown 告警，3 秒超时且不阻断主链路。
 
 ## 上传接口预算（P95 ≤ 1s）
 
@@ -50,6 +51,7 @@
 | `IMPORT_BATCH_SIZE` | 处理单元大小，默认 1000 |
 | `IMPORT_WORKER_CONCURRENCY` | Worker 并发，默认 4 |
 | `INTERNAL_API_KEY` | 内部 Dispatcher API 鉴权 |
+| `IMPORT_ALERT_WEBHOOK_URL` | 可选钉钉兼容 Webhook；降级和最终失败告警，未配置时关闭 |
 | `SERVERLESS_IMPORT_MAX_BYTES` | Vercel 小文件兜底上限，默认 512000；大文件交给常驻 Worker |
 
 ## 验证
